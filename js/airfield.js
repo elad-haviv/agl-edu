@@ -16,6 +16,7 @@
   const state = { cat: 3, step: 5, view: "color", failA: false, sel: "edge", dimmed: false, papiAngle: 3.0 };
   const lights = [];
   const groups = {};
+  const labels = [];
   let svg;
 
   function el(name, attrs, parent) {
@@ -48,14 +49,21 @@
     ys.forEach(y => light(gid, x, y, color, opts));
   }
 
-  function text(x, y, str, attrs) {
-    const t = el("text", Object.assign({ x, y, fill: "var(--night-muted)", "font-size": 12, "font-family": "IBM Plex Sans, system-ui, sans-serif" }, attrs || {}), svg);
-    t.textContent = str;
+  function text(x, y, str, attrs, vars) {
+    const t = el("text", Object.assign({ x, y, fill: "var(--night-muted)", "font-size": 12, "font-family": "IBM Plex Sans, IBM Plex Sans Hebrew, system-ui, sans-serif" }, attrs || {}), svg);
+    labels.push([t, str, vars]);
+    t.textContent = AGL.t(str, vars);
     return t;
   }
 
+  function relabel() {
+    labels.forEach(([t, str, vars]) => { t.textContent = AGL.t(str, vars); });
+    svg.setAttribute("aria-label", AGL.t("Plan of runway 09/27 with approach, runway, taxiway and apron lighting"));
+    AGL.bidiSvg(svg);
+  }
+
   function build(host) {
-    svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Plan of runway 09/27 with approach, runway, taxiway and apron lighting" });
+    svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img" });
     host.appendChild(svg);
 
     const defs = el("defs", {}, svg);
@@ -198,7 +206,7 @@
     [0, 250, 500].forEach(m => {
       const x = sbx + m * K;
       el("line", { x1: x, y1: sby - 4, x2: x, y2: sby + 4, stroke: "var(--night-muted)" }, svg);
-      text(x, sby + 18, m + " m", { "text-anchor": "middle", "font-size": 11 });
+      text(x, sby + 18, "{m} m", { "text-anchor": "middle", "font-size": 11 }, { m });
     });
     text(sbx, sby - 10, "Longitudinal scale", { "font-size": 11 });
   }
@@ -224,7 +232,7 @@
     const host = document.getElementById("map-legend");
     host.innerHTML = "";
     if (state.view === "circuit") {
-      [["A", "Circuit A"], ["B", "Circuit B (interleaved)"], ["S", "Single / individually switched"]].forEach(([k, label]) => {
+      [["A", AGL.t("Circuit A")], ["B", AGL.t("Circuit B (interleaved)")], ["S", AGL.t("Single / individually switched")]].forEach(([k, label]) => {
         const s = document.createElement("span");
         s.className = "pill";
         s.style.color = "var(--night-ink)";
@@ -235,7 +243,7 @@
       });
     }
     ORDER.forEach(id => {
-      const info = AGL.LIGHTS[id];
+      const info = AGL.d("LIGHTS")[id];
       const hidden = state.cat !== 3 && (id === "rcl" || id === "tdz" || id === "stopbar");
       const b = document.createElement("button");
       b.type = "button";
@@ -249,31 +257,31 @@
   function papiHtml() {
     const settings = [2.5, 2.8333, 3.1667, 3.5]; // pilot's view, left (outer) to right (nearest runway)
     const whites = settings.filter(s => state.papiAngle > s).length;
-    const msg = ["Well below the glide path", "Slightly low", "On the glide path", "Slightly high", "Well above the glide path"][whites];
+    const msg = AGL.t(["Well below the glide path", "Slightly low", "On the glide path", "Slightly high", "Well above the glide path"][whites]);
     const units = settings.map(s => `<i style="background:${state.papiAngle > s ? "var(--l-white)" : "var(--l-red)"}"></i>`).join("");
     return `<div class="section">
-      <h4>Fly the PAPI</h4>
-      <label class="ctl-label" for="papi-angle">Approach angle <span class="mono">${state.papiAngle.toFixed(2)}°</span></label>
+      <h4>${AGL.t("Fly the PAPI")}</h4>
+      <label class="ctl-label" for="papi-angle">${AGL.t("Approach angle")} <span class="mono" dir="ltr">${state.papiAngle.toFixed(2)}°</span></label>
       <input type="range" id="papi-angle" min="2" max="4" step="0.05" value="${state.papiAngle}">
       <div class="papi" aria-hidden="true">${units}</div>
-      <p class="small"><strong>${msg}.</strong> ${4 - whites} red, ${whites} white.</p>
+      <p class="small"><strong>${msg}.</strong> ${AGL.t("{r} red, {w} white.", { r: 4 - whites, w: whites })}</p>
     </div>`;
   }
 
   function renderInfo() {
-    const info = AGL.LIGHTS[state.sel];
+    const info = AGL.d("LIGHTS")[state.sel];
     const host = document.getElementById("light-info");
     const specs = info.specs.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
     host.innerHTML = `
-      <span class="tag">Selected system</span>
+      <span class="tag">${AGL.t("Selected system")}</span>
       <h4>${info.name}</h4>
       <p class="small"><span class="swatch" style="background:${info.colour}"></span>${info.colourText}</p>
       <p>${info.purpose}</p>
-      <dl>${specs}<dt>Circuits</dt><dd>${info.circuits}</dd></dl>
+      <dl>${specs}<dt>${AGL.t("Circuits")}</dt><dd>${info.circuits}</dd></dl>
       ${info.papi ? papiHtml() : ""}
-      <h4 style="font-size:1.1rem">Electrical notes</h4>
+      <h4 style="font-size:1.1rem">${AGL.t("Electrical notes")}</h4>
       <p class="small">${info.electrical}</p>
-      <p class="ref">${info.refs}</p>`;
+      <p class="ref" dir="ltr">${info.refs}</p>`;
     const r = document.getElementById("papi-angle");
     if (r) r.addEventListener("input", e => {
       state.papiAngle = parseFloat(e.target.value);
@@ -309,13 +317,17 @@
       render();
     });
     const fail = document.getElementById("fail-a");
+    const failLabel = () => { fail.textContent = AGL.t(state.failA ? "Restore circuit A" : "Lose circuit A"); };
     fail.hidden = false;
     fail.addEventListener("click", () => {
       state.failA = !state.failA;
       fail.setAttribute("aria-pressed", String(state.failA));
-      fail.textContent = state.failA ? "Restore circuit A" : "Lose circuit A";
+      failLabel();
       render();
     });
+    failLabel();
+    relabel();
     render();
+    AGL.onLang(() => { failLabel(); relabel(); render(); });
   };
 })();

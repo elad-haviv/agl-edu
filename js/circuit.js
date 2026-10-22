@@ -83,9 +83,10 @@
     if (parent) parent.appendChild(n);
     return n;
   }
+  const labels = [];
   function txt(x, y, s, attrs, parent) {
-    const t = el("text", Object.assign({ x, y, fill: "var(--night-muted)", "font-size": 12, "font-family": "IBM Plex Sans, system-ui, sans-serif" }, attrs || {}), parent || svg);
-    t.textContent = s;
+    const t = el("text", Object.assign({ x, y, fill: "var(--night-muted)", "font-size": 12, "font-family": "IBM Plex Sans, IBM Plex Sans Hebrew, system-ui, sans-serif" }, attrs || {}), parent || svg);
+    if (s) { labels.push([t, s]); t.textContent = AGL.t(s); }
     return t;
   }
 
@@ -100,7 +101,7 @@
   }
 
   function build(host) {
-    svg = el("svg", { viewBox: "0 0 800 360", role: "img", "aria-label": "Series circuit with a constant current regulator and eight fixtures" });
+    svg = el("svg", { viewBox: "0 0 800 360", role: "img" });
     host.appendChild(svg);
     const defs = el("defs", {}, svg);
     const f = el("filter", { id: "lampglow", x: "-150%", y: "-150%", width: "400%", height: "400%" }, defs);
@@ -148,8 +149,7 @@
       const toggle = () => toggleLamp(k);
       g.addEventListener("click", toggle);
       g.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
-      g.setAttribute("aria-label", `Fixture ${k + 1}: select to fail or repair its lamp`);
-      return { halo, bulb, cross, amps };
+      return { g, halo, bulb, cross, amps };
     });
     txt(20, 24, "Select a lamp to fail it", { "font-size": 11 });
   }
@@ -159,8 +159,10 @@
   function render() {
     const r = solve();
     const running = !state.open;
-    parts.ccrI.textContent = running ? fmt(r.I, 1) + " A" : "TRIP";
-    parts.ccrS.textContent = "Step B" + (state.step + 1);
+    labels.forEach(([t, s]) => { t.textContent = AGL.t(s); });
+    svg.setAttribute("aria-label", AGL.t("Series circuit with a constant current regulator and eight fixtures"));
+    parts.ccrI.textContent = running ? fmt(r.I, 1) + " A" : AGL.t("TRIP");
+    parts.ccrS.textContent = AGL.t("Step B{n}", { n: state.step + 1 });
     parts.cable.style.stroke = running ? "var(--c-a)" : "#3a4c5e";
     parts.flow.style.display = running ? "" : "none";
     parts.flow.style.animationDuration = (2.6 - state.step * 0.4) + "s";
@@ -178,7 +180,8 @@
       fx.bulb.style.opacity = failed || vis === 0 ? 1 : 0.25 + 0.75 * vis;
       fx.halo.style.opacity = failed ? 0 : vis * 0.9;
       fx.cross.style.display = failed ? "" : "none";
-      fx.amps.textContent = failed ? "open" : fmt(r.fixtureI[k], 1) + " A";
+      fx.amps.textContent = failed ? AGL.t("open") : fmt(r.fixtureI[k], 1) + " A";
+      fx.g.setAttribute("aria-label", AGL.t("Fixture {k}: select to fail or repair its lamp", { k: k + 1 }));
       fx.amps.style.fill = !failed && running && r.fixtureI[k] < r.I * 0.95 ? "var(--l-red)" : "var(--night-muted)";
     });
 
@@ -191,16 +194,17 @@
       ["Insulation", r.ir >= 1 ? fmt(r.ir, 0) : fmt(r.ir, 2), "MΩ"]
     ];
     document.getElementById("sim-readouts").innerHTML = ro.map(([k, v, u]) =>
-      `<div class="readout"><span class="k">${k}</span><span class="v">${v}<small>${u}</small></span></div>`).join("");
+      `<div class="readout"><span class="k">${AGL.t(k)}</span><span class="v"><bdi dir="ltr">${v}<small>${u}</small></bdi></span></div>`).join("");
 
     const pills = [];
-    pills.push(running ? ["on-ok", "CCR regulating"] : ["on-bad", "Tripped: open circuit"]);
-    pills.push(state.ef1 || state.ef2 ? ["on-warn", "Earth fault alarm"] : ["", "No earth fault"]);
-    pills.push(state.failed.size ? ["on-warn", `Lamp-out alarm: ${state.failed.size}`] : ["", "No lamps out"]);
-    if (r.bypass && running) pills.push(["on-bad", "Section bypassed through earth"]);
+    pills.push(running ? ["on-ok", AGL.t("CCR regulating")] : ["on-bad", AGL.t("Tripped: open circuit")]);
+    pills.push(state.ef1 || state.ef2 ? ["on-warn", AGL.t("Earth fault alarm")] : ["", AGL.t("No earth fault")]);
+    pills.push(state.failed.size ? ["on-warn", AGL.t("Lamp-out alarm: {n}", { n: state.failed.size })] : ["", AGL.t("No lamps out")]);
+    if (r.bypass && running) pills.push(["on-bad", AGL.t("Section bypassed through earth")]);
     document.getElementById("sim-alarms").innerHTML = pills.map(([cls, t]) => `<span class="pill ${cls}">${t}</span>`).join("");
 
     document.getElementById("sim-log").innerHTML = log.map(t => `<p>${t}</p>`).join("");
+    AGL.bidiSvg(svg);
     return r;
   }
 
@@ -221,14 +225,15 @@
 
   function toggleLamp(k) {
     if (state.open) {
-      note("The circuit is tripped. Repair the open circuit before testing lamps.");
+      note(AGL.t("The circuit is tripped. Repair the open circuit before testing lamps."));
       render();
       return;
     }
     act(() => { state.failed.has(k) ? state.failed.delete(k) : state.failed.add(k); }, (b, a) =>
       state.failed.has(k)
-        ? `Lamp ${k + 1} failed. Its transformer secondary is now open, so the core saturates and the voltage across its primary rises. The loop stays closed: the CCR still delivers ${fmt(a.I, 1)} A and the other lamps are unchanged. Output voltage moved from ${v(b.V)} to ${v(a.V)} and power factor fell from ${fmt(b.pf, 2)} to ${fmt(a.pf, 2)}: that change is how the CCR detects lamp failures.`
-        : `Lamp ${k + 1} replaced. Output voltage back to ${v(a.V)}.`);
+        ? AGL.t("Lamp {k} failed. Its transformer secondary is now open, so the core saturates and the voltage across its primary rises. The loop stays closed: the CCR still delivers {i} A and the other lamps are unchanged. Output voltage moved from {v1} to {v2} and power factor fell from {pf1} to {pf2}: that change is how the CCR detects lamp failures.",
+          { k: k + 1, i: fmt(a.I, 1), v1: v(b.V), v2: v(a.V), pf1: fmt(b.pf, 2), pf2: fmt(a.pf, 2) })
+        : AGL.t("Lamp {k} replaced. Output voltage back to {v}.", { k: k + 1, v: v(a.V) }));
   }
 
   AGL.initCircuit = function () {
@@ -243,38 +248,46 @@
       b.addEventListener("click", () => {
         seg.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
         act(() => { state.step = k; }, (bf, af) => state.open
-          ? `Step set to B${k + 1}, but the CCR is tripped and delivers nothing.`
-          : `Step B${k + 1}: the CCR now holds ${fmt(af.I, 1)} A. Output voltage changed from ${v(bf.V)} to ${v(af.V)}. Every lamp sees the same current, so all change brightness together (about ${fmt(intensity(af.I), af.I < 4 ? 2 : 0)} % of full intensity for halogen).`);
+          ? AGL.t("Step set to B{n}, but the CCR is tripped and delivers nothing.", { n: k + 1 })
+          : AGL.t("Step B{n}: the CCR now holds {i} A. Output voltage changed from {v1} to {v2}. Every lamp sees the same current, so all change brightness together (about {p} % of full intensity for halogen).",
+            { n: k + 1, i: fmt(af.I, 1), v1: v(bf.V), v2: v(af.V), p: fmt(intensity(af.I), af.I < 4 ? 2 : 0) }));
       });
       seg.appendChild(b);
     });
     document.getElementById("sim-fixture").addEventListener("change", e => {
       act(() => { state.fixture = e.target.value; }, (b, a) =>
-        `Fixtures changed to ${FIXTURES[state.fixture].label}. Load at this step is now ${fmt(a.S / 1000, 2)} kVA. Lower lamp power means a much smaller load change when a lamp fails, which is why lamp-out detection is harder on LED circuits.`);
+        AGL.t("Fixtures changed to {f}. Load at this step is now {s} kVA. Lower lamp power means a much smaller load change when a lamp fails, which is why lamp-out detection is harder on LED circuits.",
+          { f: AGL.t(FIXTURES[state.fixture].label), s: fmt(a.S / 1000, 2) }));
     });
     document.getElementById("sim-open").addEventListener("click", () => {
       if (state.open) return;
       act(() => { state.open = true; }, () =>
-        "Primary cable cut. Current falls to zero, so the CCR raises its voltage toward its maximum trying to restore it. Open-circuit protection trips the regulator within seconds. Every lamp on the loop goes out. Isolate, then find the break by sectionalising.");
+        AGL.t("Primary cable cut. Current falls to zero, so the CCR raises its voltage toward its maximum trying to restore it. Open-circuit protection trips the regulator within seconds. Every lamp on the loop goes out. Isolate, then find the break by sectionalising."));
     });
     document.getElementById("sim-ef1").addEventListener("click", () => {
       if (state.ef1) return;
       act(() => { state.ef1 = true; }, (b, a) => a.bypass
-        ? `Second earth fault, near fixture 3. Current now has a path through the ground between the two faults. The CCR still regulates ${fmt(a.I, 1)} A, but fixtures 3 to 6 only get about ${fmt(a.fixtureI[2], 1)} A and go dim or dark.`
-        : "Earth fault near fixture 3. One fault gives no return path, so the lamps are unaffected. Only the insulation monitor notices: it drops from 500 MΩ to near zero. This is the time to find it.");
+        ? AGL.t("Second earth fault, near fixture {f}. Current now has a path through the ground between the two faults. The CCR still regulates {i} A, but fixtures 3 to 6 only get about {s} A and go dim or dark.", { f: 3, i: fmt(a.I, 1), s: fmt(a.fixtureI[2], 1) })
+        : AGL.t("Earth fault near fixture {f}. One fault gives no return path, so the lamps are unaffected. Only the insulation monitor notices: it drops from 500 MΩ to near zero. This is the time to find it.", { f: 3 }));
     });
     document.getElementById("sim-ef2").addEventListener("click", () => {
       if (state.ef2) return;
       act(() => { state.ef2 = true; }, (b, a) => a.bypass
-        ? `Second earth fault, near fixture 6. Current now has a path through the ground between the two faults. The CCR still regulates ${fmt(a.I, 1)} A, but fixtures 3 to 6 only get about ${fmt(a.fixtureI[2], 1)} A and go dim or dark.`
-        : "Earth fault near fixture 6. One fault gives no return path, so the lamps are unaffected. Only the insulation monitor notices. This is the time to find it.");
+        ? AGL.t("Second earth fault, near fixture {f}. Current now has a path through the ground between the two faults. The CCR still regulates {i} A, but fixtures 3 to 6 only get about {s} A and go dim or dark.", { f: 6, i: fmt(a.I, 1), s: fmt(a.fixtureI[2], 1) })
+        : AGL.t("Earth fault near fixture {f}. One fault gives no return path, so the lamps are unaffected. Only the insulation monitor notices: it drops from 500 MΩ to near zero. This is the time to find it.", { f: 6 }));
     });
     document.getElementById("sim-reset").addEventListener("click", () => {
       act(() => { state.failed.clear(); state.open = false; state.ef1 = false; state.ef2 = false; }, (b, a) =>
-        `Circuit repaired and re-energised at B${state.step + 1}: ${fmt(a.I, 1)} A, ${v(a.V)}, insulation ${fmt(a.ir, 0)} MΩ.`);
+        AGL.t("Circuit repaired and re-energised at B{n}: {i} A, {v}, insulation {ir} MΩ.", { n: state.step + 1, i: fmt(a.I, 1), v: v(a.V), ir: fmt(a.ir, 0) }));
     });
-    const r = render();
-    note(`Ready. CCR at B${state.step + 1} delivering ${fmt(r.I, 1)} A into eight ${FIXTURES[state.fixture].label} fixtures. Output voltage ${v(r.V)}, load ${fmt(r.S / 1000, 2)} kVA.`);
-    render();
+    const ready = () => {
+      const r = render();
+      log.length = 0;
+      note(AGL.t("Ready. CCR at B{n} delivering {i} A into eight {f} fixtures. Output voltage {v}, load {s} kVA.",
+        { n: state.step + 1, i: fmt(r.I, 1), f: AGL.t(FIXTURES[state.fixture].label), v: v(r.V), s: fmt(r.S / 1000, 2) }));
+      render();
+    };
+    ready();
+    AGL.onLang(ready);
   };
 })();

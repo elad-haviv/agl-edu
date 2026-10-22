@@ -30,5 +30,6 @@
   AGL.initCircuit();
   AGL.initCalc();
   AGL.initLearn();
+  AGL.initLang();
   show(location.hash.slice(1), false);
 })();

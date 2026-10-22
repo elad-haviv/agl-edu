@@ -7,7 +7,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Hebrew:wght@400;500;600&family=Heebo:wght@500;700;800&display=swap">
 <link rel="stylesheet" href="css/agl.css">
 </head>
 <body>
@@ -16,6 +16,10 @@
   <div class="masthead-inner">
     <div class="brand">AGL Field Course<small>Airfield Ground Lighting for electricians, engineers and designers</small></div>
     <div class="spacer"></div>
+    <div class="seg lang" id="lang-seg" role="group" aria-label="Language / שפה">
+      <button type="button" data-lang="en" lang="en" aria-pressed="true">English</button>
+      <button type="button" data-lang="he" lang="he" dir="rtl" aria-pressed="false">עברית</button>
+    </div>
     <div class="std">ICAO Annex 14 · FAA AC 150/5340-30<br>IEC 61820 · 61821 · 61822 · 61823</div>
   </div>
 </header>
@@ -562,6 +566,9 @@
 </div>
 
 <script src="js/data.js"></script>
+<script src="js/he.js"></script>
+<script src="js/he-static.js"></script>
+<script src="js/i18n.js"></script>
 <script src="js/airfield.js"></script>
 <script src="js/circuit.js"></script>
 <script src="js/calc.js"></script>

@@ -20,6 +20,20 @@ Open `index.html` in a browser. There is no build step and no dependencies
 | H | Knowledge check | Quiz filtered by role, with explanations |
 | J | Glossary | Searchable AGL terms |
 
+## Languages
+
+English and Hebrew (right-to-left). Switch with the English / עברית control in the
+header; the choice is remembered in the browser, and Hebrew is the default when the
+browser language is Hebrew.
+
+- English text lives in `index.html` and the JS modules.
+- `js/he-static.js` maps each static English block, as the browser serialises it, to Hebrew.
+- `js/he.js` holds Hebrew interface strings (keyed by the English text) and the
+  Hebrew course data (light systems, scenarios, quiz, glossary).
+- `js/i18n.js` swaps the page between languages and sets `dir="rtl"`. Any string
+  without a Hebrew entry stays in English, so a new or edited English block needs a
+  matching entry in `js/he-static.js`.
+
 ## Structure
 
 - `index.html`: page layout and static course content
