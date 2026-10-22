@@ -118,7 +118,8 @@
 
   /* ---------- Insulation resistance trend ---------- */
   const IR_KEY = "agl-ir-readings";
-  let ir = [], irIsExample = true;
+  const IR_RECENT = 5;
+  let ir = [], irIsExample = true, irAll = false;
   const BANDS = [
     [50, 1000, "Good", "--ok"], [10, 50, "Watch", "--warn"], [1, 10, "Investigate", "--warn"], [0.1, 1, "Fault", "--bad"]
   ];
@@ -146,7 +147,12 @@
   function renderIR() {
     ir.sort((a, b) => a[0].localeCompare(b[0]));
     document.getElementById("ir-title").textContent = AGL.t(irIsExample ? "Example circuit: taxiway A edge" : "Your readings");
+    const first = irAll ? 0 : Math.max(0, ir.length - IR_RECENT);
+    const more = document.getElementById("ir-more");
+    more.hidden = ir.length <= IR_RECENT;
+    more.textContent = irAll ? AGL.t("Show recent readings only") : AGL.t("Show all {n} readings", { n: ir.length });
     document.getElementById("ir-rows").innerHTML = ir.length ? ir.map(([d, v], k) => {
+      if (k < first) return "";
       const [cls, label] = condition(v);
       return `<tr><td class="num">${esc(d)}</td><td class="num">${fmt(v, v < 10 ? 1 : 0)}</td><td><span class="pill ${cls}">${label}</span></td><td><button type="button" class="btn" data-del="${k}" aria-label="${esc(AGL.t("Delete reading of {d}", { d }))}">${AGL.t("Delete")}</button></td></tr>`;
     }).reverse().join("") : `<tr><td colspan="4" class="muted">${AGL.t("No readings yet. Add your first test result below.")}</td></tr>`;
@@ -157,13 +163,13 @@
     let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(AGL.t("Insulation resistance readings on a logarithmic scale"))}">`;
     BANDS.forEach(([lo, hi, label, tok]) => {
       s += `<rect x="${L}" y="${y(hi)}" width="${W - L - R}" height="${y(lo) - y(hi)}" fill="var(${tok})" opacity="0.08"/>`;
-      s += `<text x="${W - R - 4}" y="${y(hi) + 13}" text-anchor="end" font-size="11" fill="var(${tok})">${AGL.t(label)}</text>`;
+      s += `<text x="${W - R - 4}" y="${y(hi) + 13}" text-anchor="end" font-size="13" fill="var(${tok})">${AGL.t(label)}</text>`;
     });
     [0.1, 1, 10, 100, 1000].forEach(v => {
       s += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--rule)" stroke-width="1"/>`;
-      s += `<text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${v}</text>`;
+      s += `<text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="13" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${v}</text>`;
     });
-    s += `<text x="12" y="${T + (H - T - B) / 2}" font-size="11" fill="var(--muted)" transform="rotate(-90 12 ${T + (H - T - B) / 2})" text-anchor="middle">${AGL.t("MΩ (log scale)")}</text>`;
+    s += `<text x="12" y="${T + (H - T - B) / 2}" font-size="13" fill="var(--muted)" transform="rotate(-90 12 ${T + (H - T - B) / 2})" text-anchor="middle">${AGL.t("MΩ (log scale)")}</text>`;
     if (ir.length) {
       const pts = ir.map(([, v], k) => `${x(k).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
       if (ir.length > 1) s += `<polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>`;
@@ -173,10 +179,10 @@
       });
       const every = Math.max(1, Math.ceil(ir.length / 6));
       ir.forEach(([d], k) => {
-        if (k % every === 0 || k === ir.length - 1) s += `<text x="${x(k)}" y="${H - 12}" text-anchor="middle" font-size="11" fill="var(--muted)">${esc(shortDate(d))}</text>`;
+        if (k % every === 0 || k === ir.length - 1) s += `<text x="${x(k)}" y="${H - 12}" text-anchor="middle" font-size="13" fill="var(--muted)">${esc(shortDate(d))}</text>`;
       });
       const [, lastV] = ir[ir.length - 1];
-      s += `<text x="${Math.min(x(ir.length - 1), W - R - 40)}" y="${y(lastV) - 10}" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">${fmt(lastV, lastV < 10 ? 1 : 0)} MΩ</text>`;
+      s += `<text x="${Math.min(x(ir.length - 1), W - R - 40)}" y="${y(lastV) - 10}" text-anchor="middle" font-size="14" font-weight="600" fill="var(--ink)">${fmt(lastV, lastV < 10 ? 1 : 0)} MΩ</text>`;
     }
     s += "</svg>";
     document.getElementById("ir-chart").innerHTML = s;
@@ -234,6 +240,7 @@
       saveIR();
       renderIR();
     });
+    document.getElementById("ir-more").addEventListener("click", () => { irAll = !irAll; renderIR(); });
     renderIR();
 
     ["lr-len", "lr-cond", "lr-n", "lr-w", "lr-t", "lr-m"].forEach(id => document.getElementById(id).addEventListener("input", computeLoop));

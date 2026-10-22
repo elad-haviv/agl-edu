@@ -123,6 +123,22 @@ AGL.HE.STR = {
   "Higher than expected. Look for a high-resistance or corroded connector, or a route longer than the records show. Compare with the commissioning value.": "גבוה מהצפוי. חפשו מחבר בעל התנגדות גבוהה או מחבר קורוזיבי, או תוואי ארוך יותר ממה שמופיע בתיעוד. השוו לערך מבדיקת הקבלה.",
   "Lower than expected. Check the recorded length and transformer count. A section may be bypassed by a short circuit.": "נמוך מהצפוי. בדקו את האורך הרשום ואת מספר השנאים. ייתכן שקטע מעוקף בקצר.",
 
+  // Lessons and wayfinding
+  "Welcome": "ברוכים הבאים",
+  "Explore the map": "חקרו את המפה",
+  "Run the simulator": "הפעילו את הסימולטור",
+  "Quiz": "בוחן",
+  "Terms A–Z": "מונחים מ־A עד Z",
+  "You are here": "אתם כאן",
+  "Lesson {i} of {n}": "שיעור {i} מתוך {n}",
+  "Lessons": "שיעורים",
+  "Previous": "הקודם",
+  "Next": "הבא",
+  "Continue where you left off": "המשיכו מהמקום שבו עצרתם",
+  "Start the course": "התחילו את הקורס",
+  "Show recent readings only": "הצג רק קריאות אחרונות",
+  "Show all {n} readings": "הצג את כל {n} הקריאות",
+
   // Scenarios, quiz, glossary
   "Scenario {i} of {n}": "תרחיש {i} מתוך {n}",
   "Scenario complete.": "התרחיש הושלם.",

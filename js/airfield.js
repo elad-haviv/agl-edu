@@ -50,7 +50,7 @@
   }
 
   function text(x, y, str, attrs, vars) {
-    const t = el("text", Object.assign({ x, y, fill: "var(--night-muted)", "font-size": 12, "font-family": "IBM Plex Sans, IBM Plex Sans Hebrew, system-ui, sans-serif" }, attrs || {}), svg);
+    const t = el("text", Object.assign({ x, y, fill: "var(--night-ink)", "font-size": 18, "font-weight": 500, "font-family": "IBM Plex Sans, IBM Plex Sans Hebrew, system-ui, sans-serif" }, attrs || {}), svg);
     labels.push([t, str, vars]);
     t.textContent = AGL.t(str, vars);
     return t;
@@ -192,23 +192,23 @@
     });
 
     // Labels and scale
-    text(40, 268, "Approach lighting · 900 m");
+    text(40, 300, "Approach lighting · 900 m");
     text(X0 - 6, 272, "THR 09", { "text-anchor": "middle" });
     text(640, 275, "Runway 09/27 · 3000 m × 45 m");
     text(X1, 272, "END", { "text-anchor": "middle" });
     text(px + 8, EY1 - 30, "PAPI");
     text(470, 440, "Taxiway P");
-    text(406, 330, "A", { "font-size": 13, "font-weight": 600 });
-    text(978, 330, "B", { "font-size": 13, "font-weight": 600 });
+    text(406, 330, "A", { "font-size": 16, "font-weight": 600 });
+    text(978, 330, "B", { "font-size": 16, "font-weight": 600 });
     text(740, 474, "Apron", { "text-anchor": "middle" });
     const sbx = 40, sby = 480, sbw = 500 * K;
     el("line", { x1: sbx, y1: sby, x2: sbx + sbw, y2: sby, stroke: "var(--night-muted)", "stroke-width": 1 }, svg);
     [0, 250, 500].forEach(m => {
       const x = sbx + m * K;
       el("line", { x1: x, y1: sby - 4, x2: x, y2: sby + 4, stroke: "var(--night-muted)" }, svg);
-      text(x, sby + 18, "{m} m", { "text-anchor": "middle", "font-size": 11 }, { m });
+      text(x, sby + 18, "{m} m", { "text-anchor": "middle", "font-size": 16 }, { m });
     });
-    text(sbx, sby - 10, "Longitudinal scale", { "font-size": 11 });
+    text(sbx, sby - 10, "Longitudinal scale", { "font-size": 16 });
   }
 
   function render() {
@@ -279,7 +279,7 @@
       <p>${info.purpose}</p>
       <dl>${specs}<dt>${AGL.t("Circuits")}</dt><dd>${info.circuits}</dd></dl>
       ${info.papi ? papiHtml() : ""}
-      <h4 style="font-size:1.1rem">${AGL.t("Electrical notes")}</h4>
+      <h4>${AGL.t("Electrical notes")}</h4>
       <p class="small">${info.electrical}</p>
       <p class="ref" dir="ltr">${info.refs}</p>`;
     const r = document.getElementById("papi-angle");

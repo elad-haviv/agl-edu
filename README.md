@@ -19,6 +19,12 @@ Open `index.html` in a browser. There is no build step and no dependencies
 | G | Maintenance & fault finding | Safe isolation, preventive maintenance, branching fault scenarios |
 | H | Knowledge check | Quiz filtered by role, with explanations |
 | J | Glossary | Searchable AGL terms |
+| K | Reference tables | Standards list, colours and spacing |
+
+Each module is split into short lessons, addressed by sign codes (`#D2`; module names such
+as `#equipment` still work). The rail opens the current module's lessons, a sign-style
+breadcrumb shows the position, and Previous/Next direction signs move through the course.
+Visited lessons and the last one opened are remembered in the browser.
 
 ## Languages
 
@@ -40,7 +46,7 @@ browser language is Hebrew.
 - `css/agl.css`: styles (light and dark themes)
 - `js/data.js`: light-system data, quiz, scenarios, glossary
 - `js/airfield.js`, `js/circuit.js`, `js/calc.js`, `js/learn.js`: interactive modules
-- `js/app.js`: module navigation (`#overview`, `#lights`, `#series`, ...)
+- `js/app.js`: lesson navigation, breadcrumb, pager and progress
 
 ## Disclaimer
 

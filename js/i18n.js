@@ -6,7 +6,8 @@
   // Containers whose content the modules render themselves in the current language
   const SKIP = "#airfield, #map-legend, #light-info, #sim, #sim-steps, #sim-readouts, #sim-alarms, #sim-log, " +
     "#calc-rows, #c-results, #c-notes, #c-size, #c-size-note, #ir-rows, #ir-chart, #ir-title, #lr-dev, #lr-text, " +
-    "#ts-pick, #ts-card, #quiz-card, #quiz-best, #gloss-list, #step-label, #fail-a, #lang-seg, script, style";
+    "#ts-pick, #ts-card, #quiz-card, #quiz-best, #gloss-list, #step-label, #fail-a, #lang-seg, #ir-more, #resume, " +
+    ".crumb, .crumb-bar, .pager, .sublessons, script, style";
   const ATTRS = ["aria-label", "placeholder", "title"];
   const CONTROL = "input, select, textarea, button, svg";
   const norm = s => s.replace(/\s+/g, " ").trim();

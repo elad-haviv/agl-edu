@@ -286,5 +286,20 @@ AGL.HE.STATIC = [
   ["Terms of the trade", "מונחי המקצוע"],
   ["Search terms", "חיפוש מונחים"],
   ["e.g. CCR, barrette, counterpoise", "לדוגמה CCR, ברט, counterpoise"],
-  ["AGL Field Course is training material. Figures are typical values for learning purposes. Design, install and maintain airfield lighting to the current edition of the standards your aviation authority applies and to the equipment manufacturers' instructions.", "קורס AGL הוא חומר הדרכה. הנתונים הם ערכים טיפוסיים למטרות לימוד. תכננו, התקינו ותחזקו תאורת שדה לפי המהדורה העדכנית של התקנים שרשות התעופה שלכם מחילה ולפי הוראות יצרני הציוד."]
+  ["AGL Field Course is training material. Figures are typical values for learning purposes. Design, install and maintain airfield lighting to the current edition of the standards your aviation authority applies and to the equipment manufacturers' instructions.", "קורס AGL הוא חומר הדרכה. הנתונים הם ערכים טיפוסיים למטרות לימוד. תכננו, התקינו ותחזקו תאורת שדה לפי המהדורה העדכנית של התקנים שרשות התעופה שלכם מחילה ולפי הוראות יצרני הציוד."],
+  ["Skip to content", "דילוג לתוכן"],
+  ["Reference tables", "טבלאות עזר"],
+  ["Swipe the diagram sideways to see all of it.", "החליקו את התרשים הצידה כדי לראות את כולו."],
+  ["Try this", "נסו בעצמכם"],
+  ["Select the runway centreline lights. How does their colour tell the pilot how much runway is left?", "בחרו את פנסי קו מרכז המסלול. איך הצבע שלהם אומר לטייס כמה מסלול נותר?"],
+  ["Switch to CAT I. Which systems disappear?", "עברו ל־CAT I. אילו מערכות נעלמות?"],
+  ["Choose the Circuits view, then Lose circuit A. Is the runway still outlined?", "בחרו בתצוגת המעגלים, ואז בהפלת מעגל A. האם המסלול עדיין מותווה?"],
+  ["Select the PAPI and fly the approach angle from 2° to 4°.", "בחרו את ה־PAPI ושנו את זווית הגישה מ־2° עד 4°."],
+  ["Step from B1 to B5. The current changes, and all lamps change together.", "עברו מדרגה B1 ל־B5. הזרם משתנה, וכל הנורות משתנות יחד."],
+  ["Select lamp 3 to fail it. Which readings move, and which stay put?", "בחרו את נורה 3 כדי לשרוף אותה. אילו קריאות זזות ואילו נשארות במקומן?"],
+  ["Add one earth fault, then the second. Watch the lamps between them.", "הוסיפו תקלת הארקה אחת, ואז את השנייה. הסתכלו על הנורות שביניהן."],
+  ["Cut the primary cable and read what the regulator does.", "חתכו את הכבל הראשוני וקראו מה הווסת עושה."],
+  ["CCR types and protections", "סוגי וסתים והגנות"],
+  ["Tables to look things up", "טבלאות לעיון מהיר"],
+  ["Lookup tables used across the course. Values are typical; check the current edition of each standard.", "טבלאות העזר של הקורס. הערכים טיפוסיים; בדקו מול המהדורה העדכנית של כל תקן."]
 ];
