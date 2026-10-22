@@ -301,5 +301,6 @@ AGL.HE.STATIC = [
   ["Cut the primary cable and read what the regulator does.", "חתכו את הכבל הראשוני וקראו מה הווסת עושה."],
   ["CCR types and protections", "סוגי וסתים והגנות"],
   ["Tables to look things up", "טבלאות לעיון מהיר"],
-  ["Lookup tables used across the course. Values are typical; check the current edition of each standard.", "טבלאות העזר של הקורס. הערכים טיפוסיים; בדקו מול המהדורה העדכנית של כל תקן."]
+  ["Lookup tables used across the course. Values are typical; check the current edition of each standard.", "טבלאות העזר של הקורס. הערכים טיפוסיים; בדקו מול המהדורה העדכנית של כל תקן."],
+  ["Now lose circuit B as well. Which lights stay lit when both runway circuits fail? Then slide the brightness to Off.", "עכשיו הפילו גם את מעגל B. אילו פנסים נשארים דולקים כששני מעגלי המסלול נופלים? לאחר מכן הזיזו את העוצמה למצב כבוי."]
 ];

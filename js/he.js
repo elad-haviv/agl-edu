@@ -29,6 +29,9 @@ AGL.HE.STR = {
   "Electrical notes": "הערות חשמל",
   "Lose circuit A": "הפלת מעגל A",
   "Restore circuit A": "שחזור מעגל A",
+  "Lose circuit B": "הפלת מעגל B",
+  "Restore circuit B": "שחזור מעגל B",
+  "Off": "כבוי",
 
   // Series circuit simulator
   "Series circuit with a constant current regulator and eight fixtures": "מעגל טורי עם וסת זרם קבוע ושמונה גופי תאורה",

@@ -559,6 +559,8 @@ input[type="range"] { accent-color: var(--accent-fill); min-height: var(--tap); 
 .light-group.dim { opacity: 0.18; }
 .rgl-a { animation: rgl 1.4s steps(1) infinite; }
 .rgl-b { animation: rgl 1.4s steps(1) infinite 0.7s; }
+.light.unlit { animation: none; }
+.fail-group { display: inline-flex; flex-wrap: wrap; gap: var(--sp-2); }
 @keyframes rgl { 0% { opacity: 1; } 50% { opacity: 0.08; } }
 
 .map-below { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: var(--sp-5); align-items: start; }

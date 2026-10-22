@@ -134,7 +134,7 @@
                 </span>
               </span>
               <span class="ctl-label">Brightness <span id="step-label" class="mono">B5</span>
-                <input type="range" id="map-step" min="1" max="5" value="5" step="1" aria-label="Brightness step">
+                <input type="range" id="map-step" min="0" max="5" value="5" step="1" aria-label="Brightness step">
               </span>
               <span class="ctl-label">View
                 <span class="seg" id="view-seg">
@@ -142,7 +142,10 @@
                   <button type="button" data-view="circuit" aria-pressed="false">Circuits</button>
                 </span>
               </span>
-              <button type="button" class="btn" id="fail-a" aria-pressed="false" hidden>Lose circuit A</button>
+              <span class="fail-group">
+                <button type="button" class="btn" id="fail-a" aria-pressed="false" hidden>Lose circuit A</button>
+                <button type="button" class="btn" id="fail-b" aria-pressed="false" hidden>Lose circuit B</button>
+              </span>
             </div>
             <p class="scroll-hint">Swipe the diagram sideways to see all of it.</p>
             <div class="scene-svg" id="airfield"></div>
@@ -156,6 +159,7 @@
             <li>Select the runway centreline lights. How does their colour tell the pilot how much runway is left?</li>
             <li>Switch to CAT I. Which systems disappear?</li>
             <li>Choose the Circuits view, then Lose circuit A. Is the runway still outlined?</li>
+            <li>Now lose circuit B as well. Which lights stay lit when both runway circuits fail? Then slide the brightness to Off.</li>
             <li>Select the PAPI and fly the approach angle from 2° to 4°.</li>
           </ol>
           </div>

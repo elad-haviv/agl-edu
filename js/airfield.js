@@ -13,7 +13,8 @@
   const OPACITY = [0, 0.32, 0.48, 0.66, 0.84, 1];
   const ORDER = ["appr", "thr", "edge", "rcl", "tdz", "end", "papi", "twyedge", "twycl", "stopbar", "rgl", "signs"];
 
-  const state = { cat: 3, step: 5, view: "color", failA: false, sel: "edge", dimmed: false, papiAngle: 3.0 };
+  const UNLIT = "#3b4754";
+  const state = { cat: 3, step: 5, view: "color", failed: { A: false, B: false }, sel: "edge", dimmed: false, papiAngle: 3.0 };
   const lights = [];
   const groups = {};
   const labels = [];
@@ -214,16 +215,18 @@
   function render() {
     const glow = state.step >= 3;
     lights.forEach(L => {
-      const show = (!L.cat3 || state.cat === 3) && !(state.failA && L.circ === "A");
-      L.el.style.display = show ? "" : "none";
-      const fill = state.view === "circuit" ? CIRC[L.circ] : L.color;
-      L.el.style.fill = fill;
-      L.el.style.opacity = OPACITY[state.step];
+      L.el.style.display = !L.cat3 || state.cat === 3 ? "" : "none";
+      // Lights are drawn unlit when the circuits are switched off or their circuit has failed
+      const lit = state.step > 0 && !state.failed[L.circ];
+      L.el.classList.toggle("unlit", !lit);
+      L.el.style.fill = lit ? (state.view === "circuit" ? CIRC[L.circ] : L.color) : UNLIT;
+      L.el.style.opacity = lit ? OPACITY[state.step] : 1;
     });
     Object.keys(groups).forEach(id => {
       groups[id].classList.toggle("dim", state.dimmed && id !== state.sel);
       if (id !== "signs") groups[id].setAttribute("filter", glow ? "url(#glow)" : "");
     });
+    groups.signs.style.opacity = state.step > 0 ? "" : "0.45";
     renderLegend();
     renderInfo();
   }
@@ -311,23 +314,32 @@
     segment("cat-seg", "cat", v => { state.cat = +v; render(); });
     segment("view-seg", "view", v => { state.view = v; render(); });
     const step = document.getElementById("map-step");
+    const stepLabel = () => {
+      const text = state.step ? "B" + state.step : AGL.t("Off");
+      document.getElementById("step-label").textContent = text;
+      step.setAttribute("aria-valuetext", text);
+    };
     step.addEventListener("input", () => {
       state.step = +step.value;
-      document.getElementById("step-label").textContent = "B" + state.step;
+      stepLabel();
       render();
     });
-    const fail = document.getElementById("fail-a");
-    const failLabel = () => { fail.textContent = AGL.t(state.failA ? "Restore circuit A" : "Lose circuit A"); };
-    fail.hidden = false;
-    fail.addEventListener("click", () => {
-      state.failA = !state.failA;
-      fail.setAttribute("aria-pressed", String(state.failA));
-      failLabel();
-      render();
+    const failButtons = ["A", "B"].map(c => {
+      const b = document.getElementById("fail-" + c.toLowerCase());
+      const label = () => { b.textContent = AGL.t(state.failed[c] ? "Restore circuit " + c : "Lose circuit " + c); };
+      b.hidden = false;
+      b.addEventListener("click", () => {
+        state.failed[c] = !state.failed[c];
+        b.setAttribute("aria-pressed", String(state.failed[c]));
+        label();
+        render();
+      });
+      return label;
     });
-    failLabel();
+    const labels = () => { stepLabel(); failButtons.forEach(f => f()); };
+    labels();
     relabel();
     render();
-    AGL.onLang(() => { failLabel(); relabel(); render(); });
+    AGL.onLang(() => { labels(); relabel(); render(); });
   };
 })();
