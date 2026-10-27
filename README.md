@@ -19,7 +19,7 @@ used otherwise.
 | F | The vault | Interactive single-line diagram of the AGL substation, a mains-failure simulation checked against ICAO switch-over times, a clickable floor plan, a guided 3D tour of a complete vault with hover descriptions, and safe working in the vault |
 | G | System design | Design sequence, circuit rules, switch-over times, colours/spacing, serviceability |
 | H | Design calculators | CCR load and sizing, insulation resistance trend, loop resistance check |
-| J | Maintenance & fault finding | Safe isolation, preventive maintenance, branching fault scenarios |
+| J | Maintenance & fault finding | Safe isolation, branching fault scenarios, the "Find the short" fault-location game, preventive maintenance |
 | K | Knowledge check | Quiz filtered by role, with explanations |
 | L | Glossary | Searchable AGL terms |
 | M | Reference tables | Standards list, colours and spacing |
@@ -51,6 +51,7 @@ browser language is Hebrew.
 - `js/airfield.js`, `js/circuit.js`, `js/calc.js`, `js/learn.js`: interactive modules
 - `js/detail3d.js`: 3D engine (solid builders, perspective projection, painter's sort) and the two installation models, drawn with d3
 - `js/vault.js`, `js/vault-data.js`: module F diagram, failure simulation, floor plan and their content in English and Hebrew
+- `js/faultgame.js`: the fault-location game (module J)
 - `js/vault3d.js`: the 3D vault tour (building, equipment models, cutaway walls, guided camera stops), using the module E engine
 - `js/detail-data.js`: part names, bubble text and details for the 3D models, in English and Hebrew
 - `js/app.js`: lesson navigation, breadcrumb, pager and progress

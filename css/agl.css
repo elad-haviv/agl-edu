@@ -958,3 +958,43 @@ input[type="range"] { accent-color: var(--accent-fill); min-height: var(--tap); 
 .v3-tip strong { color: var(--sign-yellow); font-family: var(--f-display); font-size: 1.05rem; letter-spacing: 0.01em; }
 .v3-tourbar { display: inline-flex; gap: var(--sp-2); }
 .v3 .d3d-faces path, .v3 svg path { stroke-width: 0.5; stroke-linejoin: round; }
+
+/* Fault-finding game */
+.fg-game { display: flex; flex-direction: column; gap: var(--sp-4); }
+.fg-stats { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.fg-stats .readout.warn .v { color: var(--bad); }
+.fg .rwy { fill: var(--tint); stroke: var(--rule); }
+.fg .cl { stroke: var(--muted); stroke-width: 2; stroke-dasharray: 18 14; }
+.fg .span { fill: none; stroke: var(--ink); stroke-opacity: 0.55; stroke-width: 3; stroke-linejoin: round; }
+.fg .span.ok { stroke: var(--ok); stroke-opacity: 1; stroke-width: 5; }
+.fg .span.low { stroke: var(--bad); stroke-opacity: 1; stroke-width: 6; }
+.fg .vault { fill: var(--eq); stroke: var(--ink); stroke-width: 1.5; }
+.fg .lock { fill: var(--sign-yellow); stroke: var(--sign-black); }
+.fg .lockbow { fill: none; stroke: var(--sign-black); stroke-width: 2.5; }
+.fg .pit { fill: var(--surface); stroke: var(--ink); stroke-width: 1.5; }
+.fg .pit.open { fill: #1d2125; }
+.fg .lid { fill: var(--muted); }
+.fg .gap { stroke: var(--sign-yellow); stroke-width: 2.5; }
+.fg .light { fill: var(--l-white); stroke: var(--muted); }
+.fg .num { font-family: var(--f-display); font-weight: 700; font-size: 14px; fill: var(--ink); }
+.fg .lab { font-family: var(--f-body); font-weight: 600; font-size: 15px; fill: var(--ink); }
+.fg .lab.small { font-size: 13px; font-weight: 500; fill: var(--muted); }
+.fg .pick { cursor: pointer; }
+.fg .pick:hover .pit, .fg .pick:hover .vault { stroke: var(--accent); stroke-width: 3; }
+.fg .pick.on .pit, .fg .pick.on .vault { stroke: var(--accent-fill); stroke-width: 4; }
+.fg .pick:focus { outline: none; }
+.fg .pick:focus-visible .pit, .fg .pick:focus-visible .vault { stroke: var(--accent); stroke-width: 4; }
+.fg .fault circle { fill: var(--bad); fill-opacity: 0.25; stroke: var(--bad); stroke-width: 2; }
+.fg .fault path { fill: var(--bad); }
+.fg-below { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: var(--sp-5); align-items: start; }
+.fg-acts { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.fg-msg.bad { border-inline-start: 5px solid var(--bad); }
+.fg-msg.ok { border-inline-start: 5px solid var(--ok); }
+.fg-msg.info { border-inline-start: 5px solid var(--accent-fill); }
+.fg-log { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--sp-2); max-height: 320px; overflow-y: auto; font-size: var(--step--1); }
+.fg-log li { display: flex; gap: var(--sp-2); align-items: baseline; }
+.fg-result { display: flex; flex-direction: column; gap: var(--sp-3); }
+.fg-stars { font-size: 2rem; color: var(--accent-fill); letter-spacing: 0.1em; -webkit-text-stroke: 1px var(--sign-black); }
+.fg-warn { color: var(--bad); font-weight: 600; }
+@media (max-width: 1240px) { .fg-below { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 860px) { .fg-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

@@ -8,7 +8,7 @@
     "#calc-rows, #c-results, #c-notes, #c-size, #c-size-note, #ir-rows, #ir-chart, #ir-title, #lr-dev, #lr-text, " +
     "#ts-pick, #ts-card, #quiz-card, #quiz-best, #gloss-list, #step-label, #fail-a, #fail-b, #lang-seg, #ir-more, #resume, " +
     ".crumb, .crumb-bar, .pager, .sublessons, .d3d, #vault-sld, #vault-sld-info, #vault-sim, #vault-sim-table, #vault-sim-status, " +
-    "#vault-fail, #vault-gen-label, #vault-plan, #vault-plan-info, #vault-plan-list, #vault-3d, script, style";
+    "#vault-fail, #vault-gen-label, #vault-plan, #vault-plan-info, #vault-plan-list, #vault-3d, .fg-stats, .fg-map, .fg-panel, .fg-log, script, style";
   const ATTRS = ["aria-label", "placeholder", "title"];
   const CONTROL = "input, select, textarea, button, svg";
   const norm = s => s.replace(/\s+/g, " ").trim();

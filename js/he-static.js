@@ -344,5 +344,20 @@ AGL.HE.STATIC = [
   ["Thermal imaging of switchboards and CCR terminals; CCR internal inspection; earth resistance and bonding tests", "צילום תרמי של הלוחות והדקי הווסתים; בדיקה פנימית של הווסתים; בדיקות התנגדות הארקה והשוואת פוטנציאלים"],
   ["Intervals are examples. Use the maintenance programme your authority and the equipment manufacturers require.", "התדירויות הן דוגמאות. פעלו לפי תוכנית התחזוקה שהרשות שלכם ויצרני הציוד דורשים."],
   ["3D vault tour", "סיור תלת־ממדי במרכז החשמל"],
-  ["Walk around a complete vault in 3D. Point at any piece of equipment to see what it is, select it for details, or follow the guided tour from the MV room to the CCR row.", "הסתובבו במרכז חשמל שלם בתלת־ממד. הצביעו על כל פריט ציוד כדי לראות מה הוא, בחרו בו לפרטים, או עקבו אחרי הסיור המודרך מחדר המתח הגבוה ועד שורת הווסתים."]
+  ["Walk around a complete vault in 3D. Point at any piece of equipment to see what it is, select it for details, or follow the guided tour from the MV room to the CCR row.", "הסתובבו במרכז חשמל שלם בתלת־ממד. הצביעו על כל פריט ציוד כדי לראות מה הוא, בחרו בו לפרטים, או עקבו אחרי הסיור המודרך מחדר המתח הגבוה ועד שורת הווסתים."],
+  ["Find the short", "מצאו את הקצר"],
+  ["A runway edge circuit has a short to earth somewhere along its loop. Isolate it, split it at the pits, megger each section and repair the fault in as few minutes as you can. Every action costs the time it would take on the airfield.", "במעגל שולי מסלול יש קצר לאדמה איפשהו לאורך הלולאה. נתקו אותו, פצלו אותו בשוחות, בדקו בידוד לכל קטע ותקנו את התקלה בכמה שפחות דקות. כל פעולה עולה את הזמן שהיא לוקחת בשדה."],
+  ["How to play", "איך משחקים"],
+  ["Select the vault and isolate the CCR. Nothing else is safe until you do.", "בחרו את מרכז החשמל ונתקו את הווסת. שום דבר אחר אינו בטוח עד שתעשו זאת."],
+  ["Megger from the vault: a low reading confirms a short somewhere on the loop.", "בדקו בידוד ממרכז החשמל: קריאה נמוכה מאשרת שיש קצר איפשהו בלולאה."],
+  ["Select a base, open its pit and megger towards each side. Only the section containing the short reads low.", "בחרו בסיס, פתחו את השוחה שלו ובדקו בידוד לכל צד. רק הקטע שבו נמצא הקצר נותן קריאה נמוכה."],
+  ["Keep splitting the low section in half. When it is down to one or two bases, inspect them, and the open pits at each end too: their connectors belong to the section.", "המשיכו לחצות את הקטע הנמוך. כשנשארו בסיס אחד או שניים, בדקו אותם, וגם את השוחות הפתוחות בשני הקצוות: המחברים שבהן שייכים לקטע."],
+  ["Replace the faulty connector, or dig up the damaged cable span. A wrong repair costs time and the short stays.", "החליפו את המחבר התקול, או חפרו את קטע הכבל הפגוע. תיקון שגוי עולה זמן והקצר נשאר."],
+  ["Tip: opening the pit in the middle of the low section halves the search every time, so even 40 bases need only about six splits.", "טיפ: פתיחת השוחה באמצע הקטע הנמוך חוצה את החיפוש בכל פעם, כך שגם 40 בסיסים דורשים רק כשש חציות."],
+  ["Circuit size", "גודל המעגל"],
+  ["12 bases", "12 בסיסים"],
+  ["24 bases", "24 בסיסים"],
+  ["40 bases", "40 בסיסים"],
+  ["New fault", "תקלה חדשה"],
+  ["Measurements", "מדידות"]
 ];

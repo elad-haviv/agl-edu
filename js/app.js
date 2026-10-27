@@ -132,6 +132,7 @@
   AGL.initDetail3D();
   AGL.initVault();
   AGL.initVault3D();
+  AGL.initFaultGame();
   AGL.initLang();
   labelTables();
   AGL.onLang(() => { labelTables(); show(current.code, false); });
