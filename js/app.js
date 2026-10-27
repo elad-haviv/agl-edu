@@ -96,6 +96,7 @@
     if (l.code !== "A1") store.set(LAST_KEY, l.code);
     renderRail(l);
     if (l.code === "A1") renderResume();
+    document.dispatchEvent(new Event("agl:lesson"));
     const active = railLink(l.m);
     if (active && active.scrollIntoView) active.scrollIntoView({ block: "nearest", inline: "nearest" });
     if (scroll) window.scrollTo(0, 0);
@@ -128,6 +129,7 @@
   AGL.initCircuit();
   AGL.initCalc();
   AGL.initLearn();
+  AGL.initDetail3D();
   AGL.initLang();
   labelTables();
   AGL.onLang(() => { labelTables(); show(current.code, false); });

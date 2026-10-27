@@ -302,5 +302,12 @@ AGL.HE.STATIC = [
   ["CCR types and protections", "סוגי וסתים והגנות"],
   ["Tables to look things up", "טבלאות לעיון מהיר"],
   ["Lookup tables used across the course. Values are typical; check the current edition of each standard.", "טבלאות העזר של הקורס. הערכים טיפוסיים; בדקו מול המהדורה העדכנית של כל תקן."],
-  ["Now lose circuit B as well. Which lights stay lit when both runway circuits fail? Then slide the brightness to Off.", "עכשיו הפילו גם את מעגל B. אילו פנסים נשארים דולקים כששני מעגלי המסלול נופלים? לאחר מכן הזיזו את העוצמה למצב כבוי."]
+  ["Now lose circuit B as well. Which lights stay lit when both runway circuits fail? Then slide the brightness to Off.", "עכשיו הפילו גם את מעגל B. אילו פנסים נשארים דולקים כששני מעגלי המסלול נופלים? לאחר מכן הזיזו את העוצמה למצב כבוי."],
+  ["3D installation details", "פרטי התקנה בתלת־ממד"],
+  ["Inside a light installation", "מבט אל תוך התקנת פנס"],
+  ["Rotate a complete installation, cut it open, then pull it apart. In the exploded view every part has a description bubble; select a part for its full details.", "סובבו התקנה שלמה, פתחו אותה בחתך, ואז פרקו אותה לרכיבים. בתצוגה המפורקת לכל רכיב יש בועת הסבר; בחרו רכיב כדי לראות את כל הפרטים עליו."],
+  ["Elevated light on an L-867 base", "פנס מוגבה על בסיס L-867"],
+  ["In-pavement light on an L-868 base", "פנס שקוע על בסיס L-868"],
+  ["Inset lights carry aircraft wheel loads, so the base is load-bearing and locked into concrete within the pavement. Compare its layers with the elevated installation.", "פנסים שקועים נושאים את עומסי הגלגלים של המטוסים, ולכן הבסיס נושא עומס ונעול בבטון בתוך המסעה. השוו את השכבות שלו להתקנה המוגבהת."],
+  ["<a href=\"#details\">3D installation details</a>: what is inside a light base", "<a href=\"#details\">פרטי התקנה בתלת־ממד</a>: מה יש בתוך בסיס פנס"]
 ];

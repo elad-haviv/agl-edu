@@ -33,12 +33,13 @@
     <a href="#lights" data-code="B"><span class="chip">B</span><span class="label">Airfield lighting map</span></a>
     <a href="#series" data-code="C"><span class="chip">C</span><span class="label">Series circuit simulator</span></a>
     <a href="#equipment" data-code="D"><span class="chip">D</span><span class="label">CCRs, transformers, cable</span></a>
-    <a href="#design" data-code="E"><span class="chip">E</span><span class="label">System design</span></a>
-    <a href="#calc" data-code="F"><span class="chip">F</span><span class="label">Design calculators</span></a>
-    <a href="#maint" data-code="G"><span class="chip">G</span><span class="label">Maintenance &amp; fault finding</span></a>
-    <a href="#quiz" data-code="H"><span class="chip">H</span><span class="label">Knowledge check</span></a>
-    <a href="#glossary" data-code="J"><span class="chip">J</span><span class="label">Glossary</span></a>
-    <a href="#reference" data-code="K"><span class="chip">K</span><span class="label">Reference tables</span></a>
+    <a href="#details" data-code="E"><span class="chip">E</span><span class="label">3D installation details</span></a>
+    <a href="#design" data-code="F"><span class="chip">F</span><span class="label">System design</span></a>
+    <a href="#calc" data-code="G"><span class="chip">G</span><span class="label">Design calculators</span></a>
+    <a href="#maint" data-code="H"><span class="chip">H</span><span class="label">Maintenance &amp; fault finding</span></a>
+    <a href="#quiz" data-code="J"><span class="chip">J</span><span class="label">Knowledge check</span></a>
+    <a href="#glossary" data-code="K"><span class="chip">K</span><span class="label">Glossary</span></a>
+    <a href="#reference" data-code="L"><span class="chip">L</span><span class="label">Reference tables</span></a>
     <p class="rail-note">Module letters follow taxiway naming: there is no taxiway I, so neither is there a module I.</p>
   </nav>
 
@@ -90,6 +91,7 @@
             <ol>
               <li><a href="#lights">Airfield lighting map</a>: name every light by colour and position</li>
               <li><a href="#series">Series circuit simulator</a>: what lamp failures and earth faults look like</li>
+              <li><a href="#details">3D installation details</a>: what is inside a light base</li>
               <li><a href="#maint">Maintenance &amp; fault finding</a>: LOTO, meggering, sectionalising</li>
               <li><a href="#quiz">Knowledge check</a>, electrician questions</li>
             </ol>
@@ -295,8 +297,26 @@
       </article>
     </section>
 
-    <!-- E · Design -->
-    <section class="module" data-module="design" data-code="E" hidden>
+    <!-- E · 3D installation details -->
+    <section class="module" data-module="details" data-code="E" hidden>
+      <article class="lesson">
+        <div class="module-head">
+          <h2>Inside a light installation</h2>
+          <p class="lede">Rotate a complete installation, cut it open, then pull it apart. In the exploded view every part has a description bubble; select a part for its full details.</p>
+        </div>
+        <h3>Elevated light on an L-867 base</h3>
+        <div class="d3d" data-model="elevated"></div>
+      </article>
+
+      <article class="lesson">
+        <h3>In-pavement light on an L-868 base</h3>
+        <p class="lede-small">Inset lights carry aircraft wheel loads, so the base is load-bearing and locked into concrete within the pavement. Compare its layers with the elevated installation.</p>
+        <div class="d3d" data-model="inset"></div>
+      </article>
+    </section>
+
+    <!-- F · Design -->
+    <section class="module" data-module="design" data-code="F" hidden>
       <article class="lesson">
         <div class="module-head">
           <h2>From operating category to circuit schedule</h2>
@@ -373,8 +393,8 @@
       </article>
     </section>
 
-    <!-- F · Calculators -->
-    <section class="module" data-module="calc" data-code="F" hidden>
+    <!-- G · Calculators -->
+    <section class="module" data-module="calc" data-code="G" hidden>
       <article class="lesson">
         <div class="module-head">
           <h2>Size the regulator, track the insulation</h2>
@@ -460,8 +480,8 @@
       </article>
     </section>
 
-    <!-- G · Maintenance -->
-    <section class="module" data-module="maint" data-code="G" hidden>
+    <!-- H · Maintenance -->
+    <section class="module" data-module="maint" data-code="H" hidden>
       <article class="lesson">
         <div class="module-head">
           <h2>Isolate, test, split, repair, prove</h2>
@@ -503,8 +523,8 @@
       </article>
     </section>
 
-    <!-- H · Quiz -->
-    <section class="module" data-module="quiz" data-code="H" hidden>
+    <!-- J · Quiz -->
+    <section class="module" data-module="quiz" data-code="J" hidden>
       <article class="lesson" data-title="Quiz">
         <div class="module-head">
           <h2>Test what you know</h2>
@@ -525,8 +545,8 @@
       </article>
     </section>
 
-    <!-- J · Glossary -->
-    <section class="module" data-module="glossary" data-code="J" hidden>
+    <!-- K · Glossary -->
+    <section class="module" data-module="glossary" data-code="K" hidden>
       <article class="lesson" data-title="Terms A–Z">
         <div class="module-head">
           <h2>Terms of the trade</h2>
@@ -536,8 +556,8 @@
       </article>
     </section>
 
-    <!-- K · Reference -->
-    <section class="module" data-module="reference" data-code="K" hidden>
+    <!-- L · Reference -->
+    <section class="module" data-module="reference" data-code="L" hidden>
       <article class="lesson">
         <div class="module-head">
           <h2>Tables to look things up</h2>
@@ -587,7 +607,9 @@
   </main>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script src="js/data.js"></script>
+<script src="js/detail-data.js"></script>
 <script src="js/he.js"></script>
 <script src="js/he-static.js"></script>
 <script src="js/i18n.js"></script>
@@ -595,6 +617,7 @@
 <script src="js/circuit.js"></script>
 <script src="js/calc.js"></script>
 <script src="js/learn.js"></script>
+<script src="js/detail3d.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

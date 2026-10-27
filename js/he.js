@@ -142,6 +142,25 @@ AGL.HE.STR = {
   "Show recent readings only": "הצג רק קריאות אחרונות",
   "Show all {n} readings": "הצג את כל {n} הקריאות",
 
+  // 3D installation details
+  "3D view: {name}": "תצוגת תלת־ממד: {name}",
+  "Assembled": "מורכב",
+  "Exploded": "מפורק",
+  "Cutaway": "חתך",
+  "Labels": "תוויות",
+  "Ground": "קרקע",
+  "Light on": "אור דולק",
+  "Auto-rotate": "סיבוב אוטומטי",
+  "Reset view": "איפוס תצוגה",
+  "Zoom in": "הגדלה",
+  "Zoom out": "הקטנה",
+  "View": "תצוגה",
+  "Parts": "רכיבים",
+  "Show all parts": "הצג את כל הרכיבים",
+  "Select a part in the view or in the list to read about it.": "בחרו רכיב בתצוגה או ברשימה כדי לקרוא עליו.",
+  "Drag to rotate · scroll or pinch to zoom · select a part for details": "גררו כדי לסובב · גללו או צבטו כדי להגדיל · בחרו רכיב לפרטים",
+  "The 3D viewer needs an internet connection to load d3.js. Connect and reload the page.": "תצוגת התלת־ממד צריכה חיבור לאינטרנט כדי לטעון את d3.js. התחברו וטענו מחדש את הדף.",
+
   // Scenarios, quiz, glossary
   "Scenario {i} of {n}": "תרחיש {i} מתוך {n}",
   "Scenario complete.": "התרחיש הושלם.",
