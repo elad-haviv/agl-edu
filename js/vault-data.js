@@ -208,3 +208,83 @@ AGL.HE.VAULT = {
     battery: { name: "חדר UPS וסוללות", text: "UPS וסוללות בחדר מאוורר וממוזג. חדרי סוללות זקוקים לאוורור בגלל הגז שחלק מהסוללות משחררות בזמן טעינה." }
   }
 };
+
+AGL.VAULT3D = {
+  intro: {
+    title: "Walk through the vault",
+    text: "The roof is off and the walls nearest you drop to waist height as you turn, so you can see into every room. Point at any piece of equipment for a description, select it for details, or take the guided tour."
+  },
+  parts: {
+    ccrs: { name: "Constant current regulators", short: "One CCR per field circuit, with display, step selector and status lamps", text: "Each cabinet regulates one series circuit. The display shows output current and alarms, the selector switches between remote, local and off, and the lamps show running, alarm and fault. The output cable drops into the trench below." },
+    trench: { name: "Cable trench", short: "Covered floor trench carrying the series cables out of the building", text: "Chequer-plate covers sit over a concrete trench running along the CCR row. One plate is lifted here to show the 5 kV series cables on their way to the duct bank. Replace covers before leaving: an open trench is a fall hazard." },
+    mats: { name: "Insulating mats and clearance", short: "Rubber mats and the yellow-marked working clearance", text: "Rubber insulating mats run along the front of the CCRs. The yellow lines mark the working clearance that must stay free of stored material, so doors open fully and staff can step back safely." },
+    lv: { name: "Main LV switchboard", short: "Incomer and one breaker per CCR, with metering", text: "The first section holds the incoming breaker and meters; the others hold the outgoing breakers, one per CCR and service. The red and blue line along the top is the mimic diagram. Every breaker is labelled with the circuit it feeds." },
+    ats: { name: "Automatic transfer switch", short: "Moves the essential bus between mains and generator", text: "The window shows the changeover mechanism. Lamps show which source is connected, and the selector sets automatic, manual or test mode. Transfer tests are coordinated with operations, because the lights blink on transfer." },
+    earthbar: { name: "Main earth bar", short: "Copper bar where all earthing conductors meet", text: "A copper bar on insulators, with green and yellow conductors to the building earth electrode, the transformer neutral, equipment frames, cable screens and the airfield counterpoise. Each conductor is labelled so it can be disconnected and tested." },
+    alcms: { name: "ALCMS cabinets", short: "Redundant controllers and network equipment", text: "Two racks behind glass doors hold the duplicated ALCMS controllers, network switches, the fibre patch panel to the tower and the local control terminal. Status LEDs show which controller is active." },
+    hvac: { name: "Air conditioning", short: "Keeps CCRs and UPS electronics within temperature limits", text: "Wall-mounted units remove the heat from the regulators. A vault full of CCRs at step 5 gives off several kilowatts; losing cooling can trip the regulators on over-temperature." },
+    tray: { name: "Cable tray", short: "Galvanised ladder tray from the switchboard to the CCRs", text: "The supply cables run from the LV switchboard along the ladder tray and drop to the roof of each CCR. Power and control cables are kept on separate trays or separated within them." },
+    board: { name: "Safety board", short: "Single-line diagram, gloves, discharge stick, lockout station, first aid", text: "Everything needed for safe switching in one place: the single-line diagram, insulated gloves, the discharge stick, a lockout station with personal padlocks, the emergency contacts and a first-aid kit." },
+    bench: { name: "Workbench and spares", short: "Test equipment, spare lamps, transformers and CCR cards", text: "An insulation tester, a true-RMS clamp meter, spare lamps and an isolation transformer on the bench, with spare CCR cards and connector kits on the shelf above." },
+    fire: { name: "Fire protection", short: "CO2 extinguishers, smoke detectors and a call point", text: "CO2 extinguishers by each exit, smoke detectors at ceiling height and a manual call point. CO2 is suitable for electrical fires; never use water on live equipment." },
+    exits: { name: "Exits and emergency lighting", short: "Outward-opening doors with panic bars, exit signs", text: "Two exits with panic bars, illuminated exit signs above them and emergency luminaires that stay lit in a power failure, so staff can always get out." },
+    rmu: { name: "Ring main unit (MV)", short: "Medium-voltage switchgear with mimic diagram", text: "Three panels: two feeders and the transformer circuit. The mimic diagram, operating points and gauges are on the front, with cable boxes below. Only MV-authorised staff operate it." },
+    txr: { name: "Distribution transformer", short: "Cast-resin transformer, MV to 400 V", text: "Three resin-cast coils on a steel core, with HV bushings on top and copper LV busbars at the back, inside a mesh enclosure. Cast-resin units suit indoor vaults because they contain no oil." },
+    gen: { name: "Standby generator", short: "Diesel genset, exhaust silencer and day tank in a bund", text: "Radiator, diesel engine and alternator on a common skid, with the control panel beside it. The exhaust rises to a silencer and leaves through the wall; combustion air comes in through the louvre. The day tank sits in a bund that would contain a leak." },
+    ups: { name: "UPS and batteries", short: "No-break supply and its battery racks", text: "The UPS cabinet holds the rectifier, inverter and static bypass; its display shows load and battery state. The racks hold the battery strings, with an extract fan for ventilation and an eyewash station by the door." }
+  },
+  stops: [
+    { title: "The whole vault", text: "The CCR hall on the left, and on the right the MV room, the generator room and the UPS room. Power arrives in the MV room, is backed up by the generator and UPS, and leaves through the CCRs in the hall." },
+    { title: "The CCR row", text: "One regulator per field circuit, side by side along the north wall. Each one has its own breaker on the LV switchboard and its own output cable into the trench." },
+    { title: "The cable trench", text: "Series cables leave each CCR downwards into the trench and run to the duct bank outside. Keep covers on, and keep series cables apart from low-voltage and control cables." },
+    { title: "Main LV switchboard", text: "Everything in the vault is fed from here. Before working on a CCR, open and lock its breaker in this board." },
+    { title: "Transfer switch and earth bar", text: "The ATS brings the generator in when the mains fails. Beside it, the main earth bar ties together every earth in the vault and the airfield counterpoise." },
+    { title: "ALCMS cabinets", text: "The controllers that take commands from the tower and report alarms. Switching a circuit to local control here is the first step before field work." },
+    { title: "Safety board and workbench", text: "Gloves, discharge stick, padlocks and diagrams are kept by the work area, with test equipment and spares on the bench." },
+    { title: "Cable tray and air conditioning", text: "Supply cables run overhead from the switchboard to each CCR. The air conditioning removes the heat the regulators give off." },
+    { title: "Exits and fire protection", text: "Two exits with panic bars, emergency lighting and CO2 extinguishers by each door." },
+    { title: "MV room", text: "The ring main unit takes the utility feeders and supplies the cast-resin transformer, which steps down to 400 V for the vault." },
+    { title: "Generator room", text: "The standby generator, its exhaust and silencer, the air intake and the fuel day tank in its bund." },
+    { title: "UPS room", text: "The UPS and its batteries keep the ALCMS and the CCRs for the 1 s circuits running without a break when the mains fails." }
+  ]
+};
+
+AGL.HE.VAULT3D = {
+  intro: {
+    title: "סיור במרכז החשמל",
+    text: "הגג הוסר, והקירות הקרובים אליכם יורדים לגובה המותניים כשאתם מסתובבים, כך שאפשר לראות לתוך כל חדר. הצביעו על כל פריט ציוד כדי לקבל תיאור, בחרו בו לפרטים, או צאו לסיור המודרך."
+  },
+  parts: {
+    ccrs: { name: "וסתי זרם קבוע", short: "וסת לכל מעגל שדה, עם תצוגה, בורר דרגות ונוריות מצב", text: "כל ארון מווסת מעגל טורי אחד. התצוגה מראה את זרם היציאה וההתראות, הבורר מעביר בין מרחוק, מקומי וכבוי, והנוריות מראות פעולה, התראה ותקלה. כבל היציאה יורד לתעלה שמתחת." },
+    trench: { name: "תעלת כבלים", short: "תעלת רצפה מכוסה שמובילה את הכבלים הטוריים אל מחוץ למבנה", text: "פלטות מרוקעות מכסות תעלת בטון לאורך שורת הווסתים. פלטה אחת הוסרה כאן כדי להראות את כבלי 5 kV בדרכם אל מערך הצינורות. החזירו את הכיסויים לפני שאתם יוצאים: תעלה פתוחה היא סכנת נפילה." },
+    mats: { name: "שטיחי בידוד ומרווח עבודה", short: "שטיחי גומי ומרווח העבודה המסומן בצהוב", text: "שטיחי גומי מבודדים לאורך חזית הווסתים. הקווים הצהובים מסמנים את מרווח העבודה שחייב להישאר פנוי מאחסון, כדי שהדלתות ייפתחו עד הסוף והצוות יוכל לסגת בבטחה." },
+    lv: { name: "לוח מתח נמוך ראשי", short: "מפסק ראשי ומפסק לכל וסת, עם מדידה", text: "התא הראשון מכיל את המפסק הראשי ומכשירי המדידה; האחרים מכילים את המפסקים היוצאים, אחד לכל וסת ולכל שירות. הקו האדום והכחול בחלק העליון הוא התרשים המימי. כל מפסק מסומן בשם המעגל שהוא מזין." },
+    ats: { name: "מפסק העברה אוטומטי", short: "מעביר את הפס החיוני בין הרשת לגנרטור", text: "החלון מראה את מנגנון ההעברה. הנוריות מראות איזה מקור מחובר, והבורר קובע מצב אוטומטי, ידני או בדיקה. בדיקות העברה מתואמות עם התפעול, כי האורות מהבהבים בזמן ההעברה." },
+    earthbar: { name: "פס הארקה ראשי", short: "פס נחושת שבו נפגשים כל מוליכי ההארקה", text: "פס נחושת על מבדדים, עם מוליכים ירוק־צהוב אל אלקטרודת ההארקה של המבנה, אפס השנאי, גופי הציוד, סיכוכי הכבלים וה־counterpoise של השדה. כל מוליך מסומן כדי שאפשר יהיה לנתק ולבדוק אותו." },
+    alcms: { name: "ארונות ALCMS", short: "בקרים כפולים וציוד תקשורת", text: "שני ארונות מאחורי דלתות זכוכית מכילים את בקרי ה־ALCMS הכפולים, מתגי רשת, לוח החיבורים של הסיב האופטי למגדל ומסוף הבקרה המקומי. נוריות מצב מראות איזה בקר פעיל." },
+    hvac: { name: "מיזוג אוויר", short: "שומר על האלקטרוניקה של הווסתים וה־UPS בגבולות הטמפרטורה", text: "יחידות קיר מסלקות את החום מהווסתים. מרכז חשמל מלא בווסתים בדרגה 5 פולט כמה קילוואט; אובדן הקירור עלול להפיל את הווסתים על טמפרטורת יתר." },
+    tray: { name: "תעלת כבלים עילית", short: "סולם כבלים מגולוון מהלוח אל הווסתים", text: "כבלי ההזנה עוברים מלוח המתח הנמוך לאורך סולם הכבלים ויורדים לגג של כל וסת. כבלי הספק ובקרה מופרדים בסולמות נפרדים או בתוך הסולם." },
+    board: { name: "לוח בטיחות", short: "תרשים חד־קווי, כפפות, מוט פריקה, עמדת נעילה, עזרה ראשונה", text: "כל מה שצריך למיתוג בטוח במקום אחד: התרשים החד־קווי, כפפות מבודדות, מוט הפריקה, עמדת נעילה עם מנעולים אישיים, אנשי קשר לחירום וערכת עזרה ראשונה." },
+    bench: { name: "שולחן עבודה וחלפים", short: "ציוד בדיקה, נורות, שנאים וכרטיסי וסת רזרביים", text: "בודק בידוד, מד צבת True RMS, נורות רזרביות ושנאי בידוד על השולחן, עם כרטיסי וסת וערכות מחברים על המדף שמעליו." },
+    fire: { name: "הגנה מפני אש", short: "מטפי CO2, גלאי עשן ולחצן אזעקה", text: "מטפי CO2 ליד כל יציאה, גלאי עשן בגובה התקרה ולחצן אזעקה ידני. CO2 מתאים לשריפות חשמל; לעולם אין להשתמש במים על ציוד חי." },
+    exits: { name: "יציאות ותאורת חירום", short: "דלתות הנפתחות החוצה עם ידיות בהלה ושלטי יציאה", text: "שתי יציאות עם ידיות בהלה, שלטי יציאה מוארים מעליהן וגופי תאורת חירום שנשארים דולקים בהפסקת חשמל, כך שהצוות תמיד יכול לצאת." },
+    rmu: { name: "יחידת טבעת (מתח גבוה)", short: "מפסקי מתח גבוה עם תרשים מימי", text: "שלושה תאים: שתי הזנות ומעגל השנאי. התרשים המימי, נקודות ההפעלה ומדי הלחץ בחזית, ותיבות הכבלים מתחת. רק מורשי מתח גבוה מפעילים אותה." },
+    txr: { name: "שנאי חלוקה", short: "שנאי יצוק בשרף, ממתח גבוה ל־400 V", text: "שלושה סלילים יצוקים בשרף על ליבת פלדה, עם מבודדי מתח גבוה למעלה ופסי נחושת של מתח נמוך מאחור, בתוך מתחם רשת. שנאים יצוקים מתאימים למרכזי חשמל פנימיים כי אין בהם שמן." },
+    gen: { name: "גנרטור חירום", short: "גנרטור דיזל, משתיק פליטה ומיכל יומי במאצרה", text: "רדיאטור, מנוע דיזל וגנרטור (אלטרנטור) על שלדה משותפת, ולוח הבקרה לידם. הפליטה עולה למשתיק ויוצאת דרך הקיר; אוויר הבעירה נכנס דרך התריס. המיכל היומי נמצא במאצרה שתכיל דליפה." },
+    ups: { name: "UPS וסוללות", short: "הזנה ללא הפסקה ומדפי הסוללות שלה", text: "ארון ה־UPS מכיל את המיישר, הממיר ומעקף סטטי; התצוגה שלו מראה עומס ומצב סוללות. המדפים מחזיקים את שרשראות הסוללות, עם מאוורר יניקה לאוורור ועמדת שטיפת עיניים ליד הדלת." }
+  },
+  stops: [
+    { title: "מרכז החשמל כולו", text: "אולם הווסתים משמאל, ומימין חדר המתח הגבוה, חדר הגנרטור וחדר ה־UPS. החשמל מגיע לחדר המתח הגבוה, מגובה על ידי הגנרטור וה־UPS, ויוצא דרך הווסתים שבאולם." },
+    { title: "שורת הווסתים", text: "וסת אחד לכל מעגל שדה, זה לצד זה לאורך הקיר הצפוני. לכל אחד מפסק משלו בלוח המתח הנמוך וכבל יציאה משלו אל התעלה." },
+    { title: "תעלת הכבלים", text: "הכבלים הטוריים יורדים מכל וסת אל התעלה וממשיכים אל מערך הצינורות בחוץ. השאירו את הכיסויים במקומם, והפרידו בין כבלים טוריים לכבלי מתח נמוך ובקרה." },
+    { title: "לוח מתח נמוך ראשי", text: "כל מה שבמרכז החשמל מוזן מכאן. לפני עבודה על וסת, פתחו ונעלו את המפסק שלו בלוח הזה." },
+    { title: "מפסק העברה ופס הארקה", text: "ה־ATS מכניס את הגנרטור כשהרשת נופלת. לידו, פס ההארקה הראשי מחבר את כל ההארקות של מרכז החשמל ואת ה־counterpoise של השדה." },
+    { title: "ארונות ALCMS", text: "הבקרים שמקבלים פקודות מהמגדל ומדווחים על התראות. העברת מעגל לבקרה מקומית כאן היא הצעד הראשון לפני עבודה בשטח." },
+    { title: "לוח בטיחות ושולחן עבודה", text: "כפפות, מוט פריקה, מנעולים ותרשימים נמצאים ליד אזור העבודה, וציוד הבדיקה והחלפים על השולחן." },
+    { title: "סולם כבלים ומיזוג אוויר", text: "כבלי ההזנה עוברים מעל הראש מהלוח אל כל וסת. מיזוג האוויר מסלק את החום שהווסתים פולטים." },
+    { title: "יציאות והגנה מפני אש", text: "שתי יציאות עם ידיות בהלה, תאורת חירום ומטפי CO2 ליד כל דלת." },
+    { title: "חדר מתח גבוה", text: "יחידת הטבעת מקבלת את הזנות הרשת ומזינה את השנאי היצוק, שמוריד את המתח ל־400 V עבור מרכז החשמל." },
+    { title: "חדר הגנרטור", text: "גנרטור החירום, הפליטה והמשתיק שלו, פתח כניסת האוויר ומיכל הדלק היומי במאצרה." },
+    { title: "חדר ה־UPS", text: "ה־UPS והסוללות שלו ממשיכים להזין ללא הפסקה את ה־ALCMS ואת הווסתים של מעגלי השנייה האחת כשהרשת נופלת." }
+  ]
+};

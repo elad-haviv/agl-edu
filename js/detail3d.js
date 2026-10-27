@@ -766,6 +766,9 @@
     return { relang() { setLabels(); renderInfo(); render(); }, render: schedule };
   }
 
+  // Shared with the 3D vault tour (module F)
+  AGL.D3 = { cyl, box, tube, dome, spline, unit, cross, dot, sub, addv, mul, shade, clamp };
+
   AGL.initDetail3D = function () {
     const hosts = document.querySelectorAll(".d3d[data-model]");
     if (!window.d3) {

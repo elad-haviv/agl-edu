@@ -131,6 +131,7 @@
   AGL.initLearn();
   AGL.initDetail3D();
   AGL.initVault();
+  AGL.initVault3D();
   AGL.initLang();
   labelTables();
   AGL.onLang(() => { labelTables(); show(current.code, false); });

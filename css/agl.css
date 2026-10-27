@@ -860,6 +860,7 @@ input[type="range"] { accent-color: var(--accent-fill); min-height: var(--tap); 
 .d3d-info .btn { align-self: flex-start; }
 @media (max-width: 1240px) {
   .d3d-below { grid-template-columns: minmax(0, 1fr); }
+  .d3d-below > aside { order: -1; }
 }
 @media (max-width: 860px) {
   .d3d-bar { gap: var(--sp-2); padding: 10px; }
@@ -935,3 +936,25 @@ input[type="range"] { accent-color: var(--accent-fill); min-height: var(--tap); 
 @media (max-width: 860px) {
   .sld-wrap svg { min-width: 820px; }
 }
+
+/* 3D vault tour */
+.v3-view { position: relative; }
+.v3-tip {
+  position: absolute;
+  z-index: 5;
+  max-width: 280px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: var(--sign-black);
+  color: var(--sign-white);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.3);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--step--1);
+  line-height: 1.4;
+}
+.v3-tip strong { color: var(--sign-yellow); font-family: var(--f-display); font-size: 1.05rem; letter-spacing: 0.01em; }
+.v3-tourbar { display: inline-flex; gap: var(--sp-2); }
+.v3 .d3d-faces path, .v3 svg path { stroke-width: 0.5; stroke-linejoin: round; }

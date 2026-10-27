@@ -215,6 +215,17 @@ AGL.HE.STR = {
   "Floor plan": "תוכנית קומה",
   "Select a numbered item on the plan or in the list.": "בחרו פריט ממוספר בתוכנית או ברשימה.",
 
+  // 3D vault tour
+  "3D tour of an AGL vault": "סיור תלת־ממדי במרכז חשמל",
+  "Previous stop": "התחנה הקודמת",
+  "Start the tour": "התחילו את הסיור",
+  "Next stop": "התחנה הבאה",
+  "Back to the start": "חזרה להתחלה",
+  "Drag to look around · scroll or pinch to zoom · point at equipment for a description": "גררו כדי להסתכל מסביב · גללו או צבטו כדי להגדיל · הצביעו על ציוד לקבלת תיאור",
+  "Equipment": "ציוד",
+  "Stop {i} of {n}": "תחנה {i} מתוך {n}",
+  "3D tour": "סיור בתלת־ממד",
+
   // Scenarios, quiz, glossary
   "Scenario {i} of {n}": "תרחיש {i} מתוך {n}",
   "Scenario complete.": "התרחיש הושלם.",

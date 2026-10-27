@@ -342,5 +342,7 @@ AGL.HE.STATIC = [
   ["Generator start test; CCR output current at each step; insulation monitor readings", "בדיקת התנעת גנרטור; זרם יציאה של הווסתים בכל דרגה; קריאות מנטר הבידוד"],
   ["Generator on-load test and transfer switch test, coordinated with operations; UPS battery check", "בדיקת גנרטור בעומס ובדיקת מפסק ההעברה, בתיאום עם התפעול; בדיקת סוללות ה־UPS"],
   ["Thermal imaging of switchboards and CCR terminals; CCR internal inspection; earth resistance and bonding tests", "צילום תרמי של הלוחות והדקי הווסתים; בדיקה פנימית של הווסתים; בדיקות התנגדות הארקה והשוואת פוטנציאלים"],
-  ["Intervals are examples. Use the maintenance programme your authority and the equipment manufacturers require.", "התדירויות הן דוגמאות. פעלו לפי תוכנית התחזוקה שהרשות שלכם ויצרני הציוד דורשים."]
+  ["Intervals are examples. Use the maintenance programme your authority and the equipment manufacturers require.", "התדירויות הן דוגמאות. פעלו לפי תוכנית התחזוקה שהרשות שלכם ויצרני הציוד דורשים."],
+  ["3D vault tour", "סיור תלת־ממדי במרכז החשמל"],
+  ["Walk around a complete vault in 3D. Point at any piece of equipment to see what it is, select it for details, or follow the guided tour from the MV room to the CCR row.", "הסתובבו במרכז חשמל שלם בתלת־ממד. הצביעו על כל פריט ציוד כדי לראות מה הוא, בחרו בו לפרטים, או עקבו אחרי הסיור המודרך מחדר המתח הגבוה ועד שורת הווסתים."]
 ];
