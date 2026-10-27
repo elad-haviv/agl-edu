@@ -1,0 +1,59 @@
+name: Deploy to Coolify
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: coolify-deploy-main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Trigger Coolify deployment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Queue deployment and wait for it to finish
+        env:
+          COOLIFY_URL: ${{ secrets.COOLIFY_API_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          APP_UUID: y2vfgf6rswesref15xgozxsj
+          DOMAIN: https://agl-edu.haviv.pro
+        run: |
+          set -euo pipefail
+          URL="${COOLIFY_URL#http://http://}"
+          URL="${URL%/}"
+
+          echo "Triggering deploy for $APP_UUID at commit ${GITHUB_SHA:0:7}"
+          resp=$(curl -fsS -X POST \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            "$URL/deploy?uuid=$APP_UUID&force=true")
+          echo "$resp" | head -c 2000
+          echo
+
+          duuid=$(printf '%s' "$resp" | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d["deployments"][0]["deployment_uuid"])')
+          echo "deployment_uuid=$duuid"
+
+          for i in $(seq 1 60); do
+            st=$(curl -fsS -H "Authorization: Bearer $COOLIFY_TOKEN" "$URL/deployments/$duuid" \
+                 | python3 -c 'import sys,json;print(json.load(sys.stdin).get("status",""))' || true)
+            echo "[$i] status=${st:-unknown}"
+            case "$st" in
+              finished*)
+                code=$(curl -s -o /dev/null -w '%{http_code}' "$DOMAIN")
+                echo "Live check: $DOMAIN -> HTTP $code"
+                [ "$code" = "200" ] || { echo "Deployed but domain is not serving 200"; exit 1; }
+                echo "Deployed ${GITHUB_SHA:0:7} successfully"
+                exit 0
+                ;;
+              failed*|cancelled*)
+                echo "Deployment ended with status: $st"
+                exit 1
+                ;;
+            esac
+            sleep 10
+          done
+
+          echo "Timed out waiting for deployment $duuid to finish"
+          exit 1
