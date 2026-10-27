@@ -287,6 +287,8 @@ AGL.QUIZ = [
   { aud: "eng", q: "Why measure CCR output current with a true-RMS meter?", o: ["It is more robust", "Thyristor CCR output is not sinusoidal, especially at low steps", "It reads DC as well", "It is required for LED fixtures only"], a: 1, x: "Phase-controlled output is a chopped waveform. Average-responding meters misread it." },
   { aud: "des", q: "Stop bars are required where operations are conducted at RVR below:", o: ["1 500 m", "800 m", "550 m", "50 m"], a: 2, x: "ICAO requires stop bars at runway-holding positions serving a runway used below 550 m RVR." },
   { aud: "eng", q: "The main purpose of the series isolation transformer is to:", o: ["Step up the voltage for the lamp", "Keep the loop closed if a lamp fails and isolate the lamp from the primary", "Regulate current", "Filter harmonics"], a: 1, x: "It keeps the series loop intact and gives a separated low-voltage secondary for the lamp." },
+  { aud: "des", q: "The standby generator takes about 10 s to accept load. How is a 1 s switch-over met for CAT II/III runway centreline lights?", o: ["A bigger generator", "Feed the critical CCRs from a UPS no-break bus or a continuously running source", "Run the CCR on step B1", "It cannot be met"], a: 1, x: "No generator starts within 1 s. The 1 s circuits run from a UPS, or from a source already running during low-visibility operations." },
+  { aud: "elec", q: "Before working on a field circuit, what stops the tower from switching its CCR on?", o: ["Closing the series cutout", "Switching the circuit to local control at the vault, then isolating and locking its input breaker", "Switching off the UPS", "Asking the controller verbally"], a: 1, x: "In local control the tower and ALCMS cannot command the CCR, and the lock and tag keep it off." },
   { aud: "des", q: "What does individual lamp monitoring give you that CCR lamp-out detection cannot?", o: ["Lower cost", "The location of each failed light, so the 'no two adjacent failures' rule can be checked", "Brighter lights", "Faster switch-over"], a: 1, x: "CCR detection estimates how many lamps are out from load changes. Only per-lamp monitoring tells you which ones." }
 ];
 
@@ -326,5 +328,8 @@ AGL.GLOSSARY = [
   ["Switch-over time", "The maximum time for a light to recover after a failure of the normal power supply."],
   ["TDZ", "Touchdown Zone lights: white barrettes over the first 900 m of a CAT II/III runway."],
   ["Thyristor", "Semiconductor switch (SCR) used for phase-controlled power regulation in many CCRs."],
-  ["True RMS", "A meter that measures the real heating value of any waveform, needed for chopped CCR outputs."]
+  ["True RMS", "A meter that measures the real heating value of any waveform, needed for chopped CCR outputs."],
+  ["Vault", "The AGL substation: the building that holds the incoming supplies, generator, UPS, CCRs and ALCMS equipment."],
+  ["ATS", "Automatic transfer switch. Detects mains failure, starts the generator and moves the essential bus onto it once it is stable."],
+  ["UPS", "Uninterruptible power supply. Battery-backed no-break supply for control equipment and for CCRs feeding 1 s switch-over circuits."]
 ];

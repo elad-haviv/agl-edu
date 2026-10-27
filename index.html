@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Hebrew:wght@400;500;600&family=Heebo:wght@500;700;800&display=swap">
 <!-- Bump ?v= on every release so browsers and CDNs fetch the new CSS and JS -->
-<link rel="stylesheet" href="css/agl.css?v=20261027">
+<link rel="stylesheet" href="css/agl.css?v=20261027b">
 </head>
 <body>
 
@@ -35,12 +35,13 @@
     <a href="#series" data-code="C"><span class="chip">C</span><span class="label">Series circuit simulator</span></a>
     <a href="#equipment" data-code="D"><span class="chip">D</span><span class="label">CCRs, transformers, cable</span></a>
     <a href="#details" data-code="E"><span class="chip">E</span><span class="label">3D installation details</span></a>
-    <a href="#design" data-code="F"><span class="chip">F</span><span class="label">System design</span></a>
-    <a href="#calc" data-code="G"><span class="chip">G</span><span class="label">Design calculators</span></a>
-    <a href="#maint" data-code="H"><span class="chip">H</span><span class="label">Maintenance &amp; fault finding</span></a>
-    <a href="#quiz" data-code="J"><span class="chip">J</span><span class="label">Knowledge check</span></a>
-    <a href="#glossary" data-code="K"><span class="chip">K</span><span class="label">Glossary</span></a>
-    <a href="#reference" data-code="L"><span class="chip">L</span><span class="label">Reference tables</span></a>
+    <a href="#vault" data-code="F"><span class="chip">F</span><span class="label">The vault</span></a>
+    <a href="#design" data-code="G"><span class="chip">G</span><span class="label">System design</span></a>
+    <a href="#calc" data-code="H"><span class="chip">H</span><span class="label">Design calculators</span></a>
+    <a href="#maint" data-code="J"><span class="chip">J</span><span class="label">Maintenance &amp; fault finding</span></a>
+    <a href="#quiz" data-code="K"><span class="chip">K</span><span class="label">Knowledge check</span></a>
+    <a href="#glossary" data-code="L"><span class="chip">L</span><span class="label">Glossary</span></a>
+    <a href="#reference" data-code="M"><span class="chip">M</span><span class="label">Reference tables</span></a>
     <p class="rail-note">Module letters follow taxiway naming: there is no taxiway I, so neither is there a module I.</p>
   </nav>
 
@@ -316,8 +317,97 @@
       </article>
     </section>
 
-    <!-- F · Design -->
-    <section class="module" data-module="design" data-code="F" hidden>
+    <!-- F · The vault -->
+    <section class="module" data-module="vault" data-code="F" hidden>
+      <article class="lesson">
+        <div class="module-head">
+          <h2>The vault: where the airfield lighting is powered</h2>
+          <p class="lede">The AGL vault (substation) takes the airport's power supply, keeps it alive through failures, and turns it into the series currents that feed every circuit on the airfield. It is also where most switching, testing and fault finding starts.</p>
+        </div>
+        <h3>Inside the vault</h3>
+        <p class="lede-small">Power flows from top to bottom: two utility feeders, MV switchgear and a transformer, then the transfer switch that brings in the standby generator, the main LV switchboard, and one CCR per field circuit. Critical CCRs can run from a UPS no-break bus.</p>
+        <p class="scroll-hint">Swipe the diagram sideways to see all of it.</p>
+        <div class="sld-wrap" id="vault-sld"></div>
+        <aside class="panel" id="vault-sld-info" aria-live="polite"></aside>
+      </article>
+
+      <article class="lesson">
+        <h3>Mains failure and switch-over</h3>
+        <p class="lede-small">Fail the mains and watch the transfer switch start the generator while the UPS carries the no-break bus. Each circuit's recovery time is checked against the ICAO switch-over time for the operating category. Time runs at twice real speed.</p>
+        <div class="controls">
+          <span class="ctl-label">Operations
+            <span class="seg" id="vault-cat">
+              <button type="button" data-cat="1" aria-pressed="false">CAT I</button>
+              <button type="button" data-cat="3" aria-pressed="true">CAT II/III</button>
+            </span>
+          </span>
+          <button type="button" class="btn" id="vault-nobreak" aria-pressed="true">Critical CCRs on the UPS</button>
+          <span class="ctl-label">Generator ready after <span id="vault-gen-label" class="mono">10 s</span>
+            <input type="range" id="vault-gen" min="5" max="20" step="1" value="10" aria-label="Generator ready after (seconds)">
+          </span>
+          <button type="button" class="btn primary" id="vault-fail">Fail the mains</button>
+        </div>
+        <div id="vault-sim-status" class="alarms" aria-live="polite"></div>
+        <p class="scroll-hint">Swipe the diagram sideways to see all of it.</p>
+        <div class="sld-wrap" id="vault-sim"></div>
+        <div class="table-wrap"><table id="vault-sim-table"></table></div>
+        <div class="panel try">
+          <h4>Try this</h4>
+          <ol>
+            <li>With CAT II/III selected, fail the mains. Which circuits never go dark?</li>
+            <li>Restore, switch off "Critical CCRs on the UPS" and fail the mains again. Which circuits now fail their 1 s requirement?</li>
+            <li>Select CAT I. Does the generator alone meet every requirement?</li>
+            <li>Slide the generator time to 15 s or more. What happens to the 15 s circuits?</li>
+          </ol>
+        </div>
+      </article>
+
+      <article class="lesson">
+        <h3>Vault layout</h3>
+        <p class="lede-small">A typical layout separates medium voltage, the generator and the batteries from the CCR hall, and keeps clear, protected working space in front of every regulator and switchboard.</p>
+        <p class="scroll-hint">Swipe the diagram sideways to see all of it.</p>
+        <div class="sld-wrap" id="vault-plan"></div>
+        <div class="d3d-below">
+          <ol class="d3d-parts" id="vault-plan-list"></ol>
+          <aside class="panel" id="vault-plan-info" aria-live="polite"></aside>
+        </div>
+      </article>
+
+      <article class="lesson">
+        <h3>Working safely in the vault</h3>
+        <div class="callout danger">
+          <span class="sign"><span class="mand">DANGER</span></span>
+          <div>
+            <p><strong>Many live circuits share one room.</strong> The CCR next to the one you are working on may be running, its output reaches several kilovolts, and the interleaved partner of your circuit may pass through the same light bases. Isolate what you will touch, prove it dead, and treat everything else as live.</p>
+          </div>
+        </div>
+        <ol class="prose steps">
+          <li>Agree the work with air traffic control or operations, and confirm which circuits will be dark and for how long.</li>
+          <li>Switch the circuit to local control at the vault, so the tower or ALCMS cannot switch it on.</li>
+          <li>Switch the CCR off, open its input breaker on the LV switchboard, and fit your personal lock and tag.</li>
+          <li>Open the series cutout and prove the field side dead with a suitably rated detector.</li>
+          <li>For interleaved circuits, identify the partner circuit. Isolate it too if your work touches shared light bases or trenches.</li>
+          <li>Stand on the insulating mat, wear insulated gloves rated for the voltage, and wear arc-rated clothing for switchboard work as the arc-flash study requires.</li>
+          <li>To restore: remove locks, close the cutout, run the CCR through every step and check the current, return to remote control and confirm with the tower.</li>
+        </ol>
+        <h4>Routine checks in the vault</h4>
+        <div class="table-wrap">
+          <table class="stack">
+            <thead><tr><th>Typical interval</th><th>Check</th></tr></thead>
+            <tbody>
+              <tr><td>Daily</td><td>Alarm panel, CCR status lamps, room temperature, UPS status</td></tr>
+              <tr><td>Weekly</td><td>Generator start test; CCR output current at each step; insulation monitor readings</td></tr>
+              <tr><td>Monthly</td><td>Generator on-load test and transfer switch test, coordinated with operations; UPS battery check</td></tr>
+              <tr><td>Annually</td><td>Thermal imaging of switchboards and CCR terminals; CCR internal inspection; earth resistance and bonding tests</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="small muted">Intervals are examples. Use the maintenance programme your authority and the equipment manufacturers require.</p>
+      </article>
+    </section>
+
+    <!-- G · Design -->
+    <section class="module" data-module="design" data-code="G" hidden>
       <article class="lesson">
         <div class="module-head">
           <h2>From operating category to circuit schedule</h2>
@@ -394,8 +484,8 @@
       </article>
     </section>
 
-    <!-- G · Calculators -->
-    <section class="module" data-module="calc" data-code="G" hidden>
+    <!-- H · Calculators -->
+    <section class="module" data-module="calc" data-code="H" hidden>
       <article class="lesson">
         <div class="module-head">
           <h2>Size the regulator, track the insulation</h2>
@@ -481,8 +571,8 @@
       </article>
     </section>
 
-    <!-- H · Maintenance -->
-    <section class="module" data-module="maint" data-code="H" hidden>
+    <!-- J · Maintenance -->
+    <section class="module" data-module="maint" data-code="J" hidden>
       <article class="lesson">
         <div class="module-head">
           <h2>Isolate, test, split, repair, prove</h2>
@@ -524,8 +614,8 @@
       </article>
     </section>
 
-    <!-- J · Quiz -->
-    <section class="module" data-module="quiz" data-code="J" hidden>
+    <!-- K · Quiz -->
+    <section class="module" data-module="quiz" data-code="K" hidden>
       <article class="lesson" data-title="Quiz">
         <div class="module-head">
           <h2>Test what you know</h2>
@@ -546,8 +636,8 @@
       </article>
     </section>
 
-    <!-- K · Glossary -->
-    <section class="module" data-module="glossary" data-code="K" hidden>
+    <!-- L · Glossary -->
+    <section class="module" data-module="glossary" data-code="L" hidden>
       <article class="lesson" data-title="Terms A–Z">
         <div class="module-head">
           <h2>Terms of the trade</h2>
@@ -557,8 +647,8 @@
       </article>
     </section>
 
-    <!-- L · Reference -->
-    <section class="module" data-module="reference" data-code="L" hidden>
+    <!-- M · Reference -->
+    <section class="module" data-module="reference" data-code="M" hidden>
       <article class="lesson">
         <div class="module-head">
           <h2>Tables to look things up</h2>
@@ -609,16 +699,18 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="js/data.js?v=20261027"></script>
-<script src="js/detail-data.js?v=20261027"></script>
-<script src="js/he.js?v=20261027"></script>
-<script src="js/he-static.js?v=20261027"></script>
-<script src="js/i18n.js?v=20261027"></script>
-<script src="js/airfield.js?v=20261027"></script>
-<script src="js/circuit.js?v=20261027"></script>
-<script src="js/calc.js?v=20261027"></script>
-<script src="js/learn.js?v=20261027"></script>
-<script src="js/detail3d.js?v=20261027"></script>
-<script src="js/app.js?v=20261027"></script>
+<script src="js/data.js?v=20261027b"></script>
+<script src="js/detail-data.js?v=20261027b"></script>
+<script src="js/vault-data.js?v=20261027b"></script>
+<script src="js/he.js?v=20261027b"></script>
+<script src="js/he-static.js?v=20261027b"></script>
+<script src="js/i18n.js?v=20261027b"></script>
+<script src="js/airfield.js?v=20261027b"></script>
+<script src="js/circuit.js?v=20261027b"></script>
+<script src="js/calc.js?v=20261027b"></script>
+<script src="js/learn.js?v=20261027b"></script>
+<script src="js/detail3d.js?v=20261027b"></script>
+<script src="js/vault.js?v=20261027b"></script>
+<script src="js/app.js?v=20261027b"></script>
 </body>
 </html>

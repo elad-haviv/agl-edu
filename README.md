@@ -16,12 +16,13 @@ used otherwise.
 | C | Series circuit simulator | CCR, isolation transformers and lamps; lamp failures, open circuit, single and double earth faults |
 | D | CCRs, transformers, cable | Regulator types and protections, isolation transformers, cable, connectors, light bases |
 | E | 3D installation details | Rotatable, cut-away and exploded 3D models (d3.js) of an elevated light on an L-867 base and an in-pavement light on an L-868 base, with description bubbles for every part |
-| F | System design | Design sequence, circuit rules, switch-over times, colours/spacing, serviceability |
-| G | Design calculators | CCR load and sizing, insulation resistance trend, loop resistance check |
-| H | Maintenance & fault finding | Safe isolation, preventive maintenance, branching fault scenarios |
-| J | Knowledge check | Quiz filtered by role, with explanations |
-| K | Glossary | Searchable AGL terms |
-| L | Reference tables | Standards list, colours and spacing |
+| F | The vault | Interactive single-line diagram of the AGL substation, a mains-failure simulation checked against ICAO switch-over times, a clickable floor plan, and safe working in the vault |
+| G | System design | Design sequence, circuit rules, switch-over times, colours/spacing, serviceability |
+| H | Design calculators | CCR load and sizing, insulation resistance trend, loop resistance check |
+| J | Maintenance & fault finding | Safe isolation, preventive maintenance, branching fault scenarios |
+| K | Knowledge check | Quiz filtered by role, with explanations |
+| L | Glossary | Searchable AGL terms |
+| M | Reference tables | Standards list, colours and spacing |
 
 Each module is split into short lessons, addressed by sign codes (`#D2`; module names such
 as `#equipment` still work). The rail opens the current module's lessons, a sign-style
@@ -49,6 +50,7 @@ browser language is Hebrew.
 - `js/data.js`: light-system data, quiz, scenarios, glossary
 - `js/airfield.js`, `js/circuit.js`, `js/calc.js`, `js/learn.js`: interactive modules
 - `js/detail3d.js`: 3D engine (solid builders, perspective projection, painter's sort) and the two installation models, drawn with d3
+- `js/vault.js`, `js/vault-data.js`: module F diagram, failure simulation, floor plan and their content in English and Hebrew
 - `js/detail-data.js`: part names, bubble text and details for the 3D models, in English and Hebrew
 - `js/app.js`: lesson navigation, breadcrumb, pager and progress
 
