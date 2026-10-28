@@ -1,17 +1,21 @@
-/* Module J: "Find the short". A runway edge circuit has a short to earth somewhere on its loop.
-   Everything happens on one drawing: the circuit map on top, a close-up of where you stand
+/* Module J: fault-finding games on a runway edge circuit. "Find the short" (J3) hides earth faults;
+   "Find the open circuit" (J4) hides breaks in the loop. Everything happens on one drawing: the circuit map on top, a close-up of where you stand
    (the vault or a light base) and an insulation tester whose leads you clip on yourself.
    Loop positions: the vault OUT terminal is 0, base j sits at j, the vault RET terminal is N+1.
    Unplugging the primary connector on side s of base j (s = -1 towards base j-1, +1 towards j+1)
    splits the loop at j + 0.25s. Each hidden fault sits at p: in a cable span (k + 0.5), in a
-   cable-side connector (j + 0.3s) or in the isolating transformer (j). */
+   cable-side connector (j + 0.3s) or in the isolating transformer (j). An open-circuit fault also
+   splits the loop at p, and earthing jumpers bond chosen pieces of loop to earth so that a
+   continuity test from any base shows whether that piece still reaches the jumper. */
 (function () {
   const LEVELS = { easy: 12, normal: 24, hard: 40 };
-  const VOLTS = [250, 500, 1000, 2500, 5000];
+  const VOLTS = [0, 250, 500, 1000, 2500, 5000];   // 0 is the low-ohm continuity range
   const COST = { isolate: 10, cutout: 2, lid: 10, lidClose: 5, unplug: 2, replug: 3, clip: 1, conn: 30, txr: 45, span: 120 };
   const SPEED = 4;      // test seconds per real second
   const LOW = 50;       // MΩ: a settled reading below this marks the section faulty on the map
   const MAXR = 1e5;     // MΩ: the tester reads up to 100 GΩ
+  const MAXOHM = 2000;  // Ω: the continuity range reads OL above this
+  const JPARK = [[44, 679], [88, 679]];
   const JACK = { red: [614, 612], black: [614, 660] };
   const PARK = { red: [572, 612], black: [572, 660] };
   const esc = s => String(s).replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
@@ -21,13 +25,18 @@
   const mmss = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
   const mx = (s, x) => (s < 0 ? x : 580 - x);   // mirror close-up geometry for the +1 side
 
-  const st = { level: "normal", diff: "medium", volt: 1000 };
+  const vName = v => (v === 0 ? "Ω" : v >= 1000 ? v / 1000 + "k" : String(v));
+
+  function Game(host, mode) {
+  const OPEN = mode === "open";
+  const st = { level: "normal", diff: "medium", volt: OPEN ? 0 : 1000 };
   let svg = null, raf = 0;
+  const vText = v => (v === 0 ? T("continuity") : iso(v + " V"));
 
   function newGame() {
     cancelAnimationFrame(raf);
     const N = LEVELS[st.level];
-    const faults = makeFaults(N, st.diff);
+    const faults = OPEN ? makeOpens(N, st.diff) : makeFaults(N, st.diff);
     // Harmless wear that looks worrying: old tape on a joint, rust, mud
     const wear = new Map();
     for (let j = 1; j <= N; j++) {
@@ -35,16 +44,22 @@
     }
     const wet = new Set();
     for (let j = 1; j <= N; j++) if (Math.random() < 0.15) wet.add(j);
-    faults.forEach(f => { if (f.kind !== "span" && Math.random() < 0.7) wet.add(f.j); });
+    if (!OPEN) faults.forEach(f => { if (f.kind !== "span" && Math.random() < 0.7) wet.add(f.j); });
+    // Earth resistance from each base's can to the general mass of earth, Ω
+    const re = [0.4];
+    for (let j = 1; j <= N; j++) re.push(1.5 + Math.random() * 4);
     Object.assign(st, {
-      N, faults, wet, wear, k: 0.8 + Math.random() * 0.5, isolated: false, cutout: false, lids: new Set(), unplugged: new Set(),
+      N, faults, wet, wear, re, jumpers: [null, null], k: 0.8 + Math.random() * 0.5, isolated: false, cutout: false, lids: new Set(), unplugged: new Set(),
       loc: 0, clips: { red: null, black: null }, armed: null, drag: null, testing: false, t: 0, curve: [], reading: Infinity,
       vOut: 0, dis: 0, vDis: 0, result: null, minutes: 0, warnings: 0, wrong: 0, tests: 0, opened: 0, log: [], measured: [],
       done: false, alert: null
     });
     clearTimeout(alertTimer);
     renderAlert();
-    say("info", () => (st.diff === "hard" ? T("Work order: this old runway edge circuit has an earth fault alarm and has not been tested for years. Expect more than one weak spot.")
+    if (OPEN) say("info", () => (st.diff === "hard"
+      ? T("Work order: after snow clearing, the CCR on this runway edge circuit trips on open circuit. A plough hit several lights, so expect more than one break.")
+      : T("Work order: the CCR on this runway edge circuit trips on open circuit and every light on it is out.")) + " " + T("Start in the vault: switch the CCR off and lock it out."));
+    else say("info", () => (st.diff === "hard" ? T("Work order: this old runway edge circuit has an earth fault alarm and has not been tested for years. Expect more than one weak spot.")
       : faults[0].hv ? T("Work order: the CCR on this runway edge circuit trips on earth fault, but only at the high brightness steps.")
         : T("Work order: the CCR on this runway edge circuit shows an earth fault alarm.")) + " " + T("Start in the vault: switch the CCR off and lock it out."));
     render();
@@ -78,6 +93,28 @@
     }
     return out;
   }
+  /* Open circuits: a connector pulled apart or with a burnt-open contact, a transformer whose
+     primary has burnt open, or a broken cable. On easy every break in a base can be seen when the
+     base is opened; on medium and hard about half can only be found by measuring (a burnt contact
+     shows once the connector is unplugged). Hard has 2 or 3 breaks. */
+  function oneOpen(N, diff, near) {
+    const r = Math.random(), j = near || 1 + rnd(N);
+    const vis = diff === "easy" || Math.random() < 0.5;
+    if (r < (near ? 0.6 : 0.45)) { const s = Math.random() < 0.5 ? -1 : 1; return { kind: "conn", j, s, p: j + 0.3 * s, how: vis ? "pulled" : "burnt" }; }
+    if (r < (near ? 1 : 0.7)) return { kind: "txr", j, p: j, vis };
+    const k = rnd(N + 1);
+    return { kind: "span", k, p: k + 0.5 };
+  }
+  function makeOpens(N, diff) {
+    const want = diff === "hard" ? 2 + rnd(2) : 1, out = [];
+    const same = (a, b) => a.kind === b.kind && (a.kind === "span" ? a.k === b.k : a.j === b.j && (a.kind !== "conn" || a.s === b.s));
+    for (let guard = 0; out.length < want && guard < 50; guard++) {
+      const host = out.find(f => f.kind !== "span");
+      const f = oneOpen(N, diff, out.length && host && Math.random() < 0.35 ? host.j : 0);
+      if (!out.some(g => same(f, g))) out.push(f);
+    }
+    return out;
+  }
   const allFixed = () => st.faults.every(f => f.fixed);
 
   // Text may be a function so the message follows a language switch
@@ -95,7 +132,9 @@
 
   /* ---------- Circuit model ---------- */
   function splits() {
-    return [...st.unplugged].map(key => { const [j, s] = key.split(":").map(Number); return j + 0.25 * s; });
+    const out = [...st.unplugged].map(key => { const [j, s] = key.split(":").map(Number); return j + 0.25 * s; });
+    if (OPEN) st.faults.forEach(f => { if (!f.fixed) out.push(f.p); });   // a break splits the loop too
+    return out;
   }
   // The piece of loop a terminal at x connects to, looking in direction d
   function segment(x, d) {
@@ -110,14 +149,14 @@
     if (!id) return null;
     const p = id.split(":");
     if (p[0] === "v") {
-      if (p[1] === "earth") return { earth: true, label: T("vault earth bar") };
-      return p[1] === "out" ? { seg: segment(0, 1), label: T("field OUT") } : { seg: segment(st.N + 1, -1), label: T("field RET") };
+      if (p[1] === "earth") return { earth: true, loc: 0, label: T("vault earth bar") };
+      return p[1] === "out" ? { seg: segment(0, 1), x: 0, label: T("field OUT") } : { seg: segment(st.N + 1, -1), x: st.N + 1, label: T("field RET") };
     }
     const j = +p[1];
-    if (p[2] === "earth") return { earth: true, label: T("base {n} earth", { n: j }) };
+    if (p[2] === "earth") return { earth: true, loc: j, label: T("base {n} earth", { n: j }) };
     const s = +p[2], x = j + 0.25 * s;
-    return p[3] === "cable" ? { seg: segment(x, s), label: T("cable to {p}", { p: pointName(j + s) }) }
-      : { seg: segment(x, -s), label: T("transformer lead, {p} side", { p: pointName(j + s) }) };
+    return p[3] === "cable" ? { seg: segment(x, s), x, label: T("cable to {p}", { p: pointName(j + s) }) }
+      : { seg: segment(x, -s), x, label: T("transformer lead, {p} side", { p: pointName(j + s) }) };
   }
 
   // Terminals you can clip onto where you stand, with their positions on the drawing
@@ -138,6 +177,56 @@
   function checkClips() {
     const ids = terms().map(x => x.id);
     ["red", "black"].forEach(c => { if (st.clips[c] && !ids.includes(st.clips[c])) st.clips[c] = null; });
+    // A jumper whose terminal disappears (connector replugged, cutout closed) comes off with it
+    st.jumpers.forEach((jp, i) => { if (jp && jp.loc === st.loc && !ids.includes(jp.term)) st.jumpers[i] = null; });
+  }
+
+  /* ---------- Continuity (low-ohm range), in Ω ---------- */
+  const sameSeg = (a, b) => Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(a[1] - b[1]) < 1e-9;
+  // Conductor resistance along the loop between two positions: cable spans and transformer primaries
+  function cond(x1, x2) {
+    const lo = Math.min(x1, x2), hi = Math.max(x1, x2);
+    let r = 0;
+    for (let k = 0; k <= st.N; k++) r += Math.max(0, Math.min(hi, k + 1) - Math.max(lo, k)) * (k === 0 || k === st.N ? 0.6 : 0.15);
+    for (let j = 1; j <= st.N; j++) if (j > lo && j < hi) r += 0.6;
+    return r;
+  }
+  const reLoc = loc => st.re[loc];
+  // Points where a piece of loop is bonded to earth: earthing jumpers, and in the short game any fault
+  function earthPoints() {
+    const out = [];
+    st.jumpers.forEach(jp => {
+      if (!jp) return;
+      const info = termInfo(jp.term);
+      if (!info.earth) out.push({ x: info.x, seg: info.seg, loc: jp.loc, r: 0 });
+    });
+    if (!OPEN) st.faults.forEach(f => {
+      if (!f.fixed && !f.hv) out.push({ x: f.p, seg: null, loc: null, r: f.r0 * 1e6 });
+    });
+    return out;
+  }
+  // Best path from a conductor terminal to the earth at location `at`, with the point it went through
+  function pathEarth(info, at) {
+    let best = { r: Infinity, x: null };
+    earthPoints().forEach(e => {
+      const on = e.seg ? sameSeg(e.seg, info.seg) : e.x > info.seg[0] && e.x < info.seg[1];
+      if (!on) return;
+      const link = e.loc === null ? reLoc(at) : e.loc === at ? 0.05 : reLoc(e.loc) + reLoc(at);
+      const r = cond(info.x, e.x) + e.r + link;
+      if (r < best.r) best = { r, x: e.x };
+    });
+    return best;
+  }
+  function continuity() {
+    const a = termInfo(st.clips.red), b = termInfo(st.clips.black);
+    if (!a || !b) return { r: Infinity };
+    let res;
+    if (a.earth && b.earth) res = { r: a.loc === b.loc ? 0.05 : reLoc(a.loc) + reLoc(b.loc) };
+    else if (a.earth || b.earth) res = pathEarth(a.earth ? b : a, st.loc);
+    else if (sameSeg(a.seg, b.seg)) res = { r: cond(a.x, b.x) + 0.02 };
+    else res = { r: pathEarth(a, st.loc).r + pathEarth(b, st.loc).r };
+    if (!(res.r <= MAXOHM)) res.r = Infinity;
+    return res;
   }
 
   // Insulation resistance of a piece of loop, in MΩ, t seconds into a test
@@ -145,7 +234,9 @@
     const len = Math.max(0.3, seg[1] - seg[0]);
     // Healthy insulation: capacitive charging first, then dielectric absorption (PI about 2)
     let r = st.k * 20000 / len * (1 - Math.exp(-t / 1.2)) * Math.pow(Math.max(t, 0.2) / 60, 0.55);
-    st.faults.forEach(f => {
+    // An earthing jumper on this piece shorts it to earth
+    if (st.jumpers.some(jp => jp && !termInfo(jp.term).earth && sameSeg(termInfo(jp.term).seg, seg))) return Math.min(r, 2e-5);
+    if (!OPEN) st.faults.forEach(f => {
       if (f.fixed || f.p <= seg[0] || f.p >= seg[1] || (f.hv && st.volt < 2500)) return;
       const rf = f.r0 * (1 + 0.03 * t / 60);   // a leakage path barely changes with time
       r = r * rf / (r + rf);                   // faults on the same piece act in parallel
@@ -153,6 +244,7 @@
     return r;
   }
   function resistance(t) {
+    if (st.volt === 0) return continuity().r;
     const a = termInfo(st.clips.red), b = termInfo(st.clips.black);
     if (!a || !b) return Infinity;
     if (a.earth && b.earth) return 0;
@@ -163,10 +255,16 @@
   // The tester's source cannot hold its voltage into a low resistance
   function outVolts(r, t) {
     const ramp = 1 - Math.exp(-t / 0.6);
+    if (st.volt === 0) return 4 * ramp * (isFinite(r) ? r / (r + 20) : 1);
     return st.volt * ramp * (isFinite(r) ? r / (r + st.volt * 5e-4) : 1);
   }
 
+  function fmtOhm(r) {
+    if (!isFinite(r)) return "OL";
+    return r.toFixed(r < 10 ? 2 : r < 100 ? 1 : 0) + " Ω";
+  }
   function fmtR(r) {
+    if (st.volt === 0) return fmtOhm(r);
     if (!isFinite(r) || r >= MAXR) return "> 100 GΩ";
     if (r >= 1000) return (r / 1000).toFixed(r < 10000 ? 2 : 1) + " GΩ";
     if (r >= 1) return r.toFixed(r < 10 ? 2 : r < 100 ? 1 : 0) + " MΩ";
@@ -193,7 +291,8 @@
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    say("info", T("Testing at {v}. Watch the reading and press TEST again when you have what you need.", { v: iso(st.volt + " V") }));
+    say("info", st.volt === 0 ? T("Measuring continuity. Press TEST again to stop.")
+      : T("Testing at {v}. Watch the reading and press TEST again when you have what you need.", { v: iso(st.volt + " V") }));
     render();
   }
 
@@ -201,18 +300,19 @@
     cancelAnimationFrame(raf);
     st.testing = false;
     const t = st.t, r = resistance(t);
-    st.minutes += 2 + t / 60;
+    st.minutes += (st.volt === 0 ? 1 : 2) + t / 60;
+    if (st.volt === 0) { stopContinuity(t, r); return; }
     const at = s => (st.curve.find(c => c[0] >= s) || [0, null])[1];
     const r15 = t >= 15 ? at(15) : null, r60 = t >= 60 ? at(60) : null;
     st.result = { r, t, r15, r60, pi: r15 && r60 && isFinite(r60) ? r60 / r15 : null };
 
     const a = termInfo(st.clips.red), b = termInfo(st.clips.black);
     let kind = "info", seg = null;
-    if (!a || !b) kind = "open";
+    if (!a || !b) kind = "leads";
     else if (a.earth !== b.earth) {
       seg = (a.earth ? b : a).seg;
       kind = t < 3 ? "unsettled" : r < LOW ? "low" : "good";
-      if (kind !== "unsettled") st.measured.push({ seg, low: kind === "low" });
+      if (kind !== "unsettled" && !OPEN) st.measured.push({ seg, low: kind === "low" });
     }
     st.log.unshift({ kind, text: T("{where}, {v} for {t}. LINE on {red}, EARTH on {black}: {r}", {
       where: placeName(st.loc), v: iso(st.volt + " V"), t: iso(mmss(t)),
@@ -220,16 +320,17 @@
     }) + (st.result.pi ? " · PI " + iso(st.result.pi.toFixed(1)) : "") });
 
     const msgs = {
-      open: ["info", T("A lead is not connected, so the tester sees an open circuit.")],
+      leads: ["info", T("A lead is not connected, so the tester sees an open circuit.")],
       unsettled: ["info", T("You stopped before the reading settled: the cable was still charging. Hold the test for longer.")],
       low: ["bad", T("Low insulation: the short is on the conductor you tested.")],
       good: ["ok", T("Insulation good: the conductor you tested is clear at this voltage.")],
+      ...(OPEN ? { low: ["info", T("Near zero: an earthing jumper is on this piece of loop, so it is bonded to earth. Use the continuity range to look for the break.")] } : {}),
       info: ["info", a && b && a.earth && b.earth ? T("Both leads on earth: the tester reads a short, as it should.")
         : r === 0 ? T("Both leads on the same conductor: you measured its continuity, not its insulation. Put one lead on earth.")
           : T("Neither lead is on earth, so this reading is not an insulation test of one section.")]
     };
     say(...msgs[kind]);
-    if (kind === "good" && allFixed()) {
+    if (kind === "good" && allFixed() && !OPEN) {
       if (seg[0] === 0 && seg[1] === st.N + 1) finish();
       else say("ok", T("This piece is clear. The loop is still split somewhere: plug every connector back in and test the whole loop from the vault."));
     }
@@ -248,6 +349,41 @@
     render();
   }
 
+  // A continuity measurement: logged, explained, and on the open-circuit game the way to finish
+  function stopContinuity(t, r) {
+    const a = termInfo(st.clips.red), b = termInfo(st.clips.black);
+    let kind = isFinite(r) ? "cont" : "ol", text;
+    if (!a || !b) { kind = "leads"; text = T("A lead is not connected, so the tester sees an open circuit."); }
+    else if (a.earth && b.earth) text = T("Both leads on earth: the tester reads a short, as it should.");
+    else if (a.earth || b.earth) {
+      const c = a.earth ? b : a, path = pathEarth(c, st.loc);
+      if (isFinite(r)) {
+        if (OPEN && path.x !== null) st.measured.push({ seg: [Math.min(c.x, path.x), Math.max(c.x, path.x)], low: false });
+        text = OPEN ? T("Continuity to earth: {r}. This conductor is unbroken all the way to an earthing jumper.", { r: iso(fmtOhm(r)) })
+          : T("Continuity to earth: {r}. This conductor touches earth somewhere: a dead short.", { r: iso(fmtOhm(r)) });
+      } else text = OPEN ? T("Open: no path from this conductor to earth. Either it is broken between here and the jumper, or no jumper is on this piece of loop.")
+        : T("No continuity to earth, as healthy insulation should read. Use an insulation range to look for leakage.");
+    } else if (sameSeg(a.seg, b.seg)) {
+      if (OPEN) st.measured.push({ seg: [Math.min(a.x, b.x), Math.max(a.x, b.x)], low: false });
+      text = T("Continuity between the two leads: {r}. The conductor between them is unbroken.", { r: iso(fmtOhm(r)) });
+    } else text = isFinite(r) ? T("Continuity through earth: both conductors reach an earthing jumper.")
+      : T("Open between the two leads: the conductor between them is broken, or split at an unplugged connector.");
+    st.result = { r, t };
+    st.log.unshift({ kind, text: T("{where}, {v} for {t}. LINE on {red}, EARTH on {black}: {r}", {
+      where: placeName(st.loc), v: vText(0), t: iso(mmss(t)),
+      red: a ? a.label : T("not connected"), black: b ? b.label : T("not connected"), r: iso(fmtOhm(r))
+    }) });
+    say(kind === "cont" ? "ok" : kind === "ol" ? "bad" : "info", text);
+    if (OPEN && kind === "cont" && a && b && !a.earth && !b.earth && sameSeg(a.seg, b.seg) && a.seg[0] === 0 && a.seg[1] === st.N + 1 &&
+      [a.x, b.x].includes(0) && [a.x, b.x].includes(st.N + 1) && allFixed()) {
+      if (st.jumpers.some(Boolean)) say("bad", T("The loop is continuous again, but an earthing jumper is still on. Remove every jumper before the circuit goes back into service."));
+      else finish();
+    }
+    st.vDis = 0;
+    st.dis = 0;
+    render();
+  }
+
   function finish() {
     st.done = true;
     st.clips = { red: null, black: null };
@@ -255,8 +391,9 @@
     const k = Math.ceil(Math.log2(st.N + 1));
     st.par = Math.round(COST.isolate + COST.cutout + 2 * COST.clip + 3 + st.faults.reduce((t, f) => t + k * 33 + COST[f.kind] + 10, 0) + 8);
     st.stars = st.warnings ? 1 : st.minutes <= st.par ? 3 : st.minutes <= st.par * 1.5 ? 2 : 1;
-    say("ok", () => st.faults.length > 1 ? T("Whole loop proved healthy from the vault. All {n} faults cleared.", { n: st.faults.length })
-      : T("Whole loop proved healthy from the vault. Fault cleared."));
+    say("ok", () => OPEN ? T("The loop is continuous from OUT to RET and every jumper is off. Circuit restored.")
+      : st.faults.length > 1 ? T("Whole loop proved healthy from the vault. All {n} faults cleared.", { n: st.faults.length })
+        : T("Whole loop proved healthy from the vault. Fault cleared."));
   }
 
   /* ---------- Actions ---------- */
@@ -266,9 +403,24 @@
   }
 
   function placeClip(c, id) {
+    st.armed = null;
+    if (c[0] === "j") {
+      const i = +c[1];
+      st.jumpers[i] = { loc: st.loc, term: id };
+      st.minutes += COST.clip;
+      say("info", termInfo(id).earth ? T("The jumper is on earth at both ends, so it does nothing there.")
+        : T("Earthing jumper on {where}: that piece of loop is now bonded to earth.", { where: termInfo(id).label }));
+      return;
+    }
     if (st.clips[c] !== id) st.minutes += COST.clip;
     st.clips[c] = id;
-    st.armed = null;
+    say("info", T("{lead} lead clipped on {where}.", { lead: c === "red" ? T("LINE") : T("EARTH"), where: termInfo(id).label }));
+  }
+  // Touching leads during a test: dangerous on an insulation range, merely premature on continuity
+  function touchDuringTest(at) {
+    if (st.testing && st.volt === 0) say("info", T("Stop the test first: press TEST again."));
+    else if (st.testing) warn(T("Never touch the leads or connectors during a test: the cable is charged to the test voltage."), at);
+    else warn(T("Wait for the tester to discharge the cable before you touch the leads or connectors."), at);
   }
 
   function act(a, arg) {
@@ -276,13 +428,13 @@
     if (st.done) return;
     const touch = ["term", "plug", "cutout", "fix-conn", "fix-txr", "dig"].includes(a);
     if (st.testing && a !== "test" && a !== "volt" && a !== "knob") {
-      if (touch) warn(T("Never touch the leads or connectors during a test: the cable is charged to the test voltage."), spot(a, arg));
+      if (touch) touchDuringTest(spot(a, arg));
       else say("info", T("Stop the test first: press TEST again."));
       render();
       return;
     }
     if (st.dis > 0 && a !== "volt" && a !== "knob") {
-      if (touch) warn(T("Wait for the tester to discharge the cable before you touch the leads or connectors."), spot(a, arg));
+      if (touch) touchDuringTest(spot(a, arg));
       else say("info", T("The tester is still discharging the cable."));
       render();
       return;
@@ -335,7 +487,8 @@
         else {
           st.unplugged.add(key);
           st.minutes += COST.unplug;
-          say("info", T("Connector unplugged: the loop is split here. Clip a lead onto either side."));
+          say("info", T("Connector unplugged: the loop is split here. Clip a lead onto either side.") +
+            (OPEN && openConn(j, arg) && openConn(j, arg).how === "burnt" ? " " + T("The contact pin is burnt away.") : ""));
         }
         checkClips();
         break;
@@ -346,7 +499,18 @@
         st.minutes += COST[kind];
         const hit = st.faults.find(f => !f.fixed && f.kind === kind &&
           (kind === "conn" ? f.j === j && f.s === arg : kind === "txr" ? f.j === j : f.k === Math.min(j, j + arg)));
-        if (hit) {
+        if (hit && OPEN) {
+          hit.fixed = true;
+          st.measured = [];
+          say("ok", (kind === "conn" ? T("You fitted a new connector. The joint is continuous again.")
+            : kind === "txr" ? T("The old transformer's primary winding was burnt open. New transformer fitted.")
+              : T("You found the cable snapped where frost heave had pulled it tight in the duct, and spliced in a new length.")) + " " +
+            T("Plug everything back in, take off the jumpers and prove the loop continuous from OUT to RET in the vault."));
+        } else if (OPEN) {
+          st.wrong++;
+          say("bad", kind === "span" ? T("Two hours of digging and the cable is intact. The break is somewhere else.")
+            : T("The new part went in, but the old one was fine. The break is somewhere else."));
+        } else if (hit) {
           hit.fixed = true;
           st.measured = [];
           say("ok", (kind === "conn" ? (hit.hv ? T("You cut out a connector with a hairline crack through its boot and fitted a new one.")
@@ -366,17 +530,14 @@
       case "knob":
         if (st.testing) { say("info", T("The range switch is locked while a test runs.")); break; }
         st.volt = a === "volt" ? arg : VOLTS[(VOLTS.indexOf(st.volt) + 1) % VOLTS.length];
-        say("info", T("Test voltage set to {v}.", { v: iso(st.volt + " V") }));
+        say("info", st.volt === 0 ? T("Range set to continuity (Ω): a low-ohm test at 200 mA.") : T("Test voltage set to {v}.", { v: iso(st.volt + " V") }));
         break;
       case "test":
         if (st.testing) stopTest(); else startTest();
         return;
-      case "term": {
-        const c = st.armed || (!st.clips.red ? "red" : !st.clips.black ? "black" : "red");
-        placeClip(c, arg);
-        say("info", T("{lead} lead clipped on {where}.", { lead: c === "red" ? T("LINE") : T("EARTH"), where: termInfo(arg).label }));
+      case "term":
+        placeClip(st.armed || (!st.clips.red ? "red" : !st.clips.black ? "black" : "red"), arg);
         break;
-      }
     }
     render();
   }
@@ -430,9 +591,16 @@
     const [hx, hy] = placeOf(st.loc);
     const py = st.loc === 0 ? 100 : hy < 150 ? hy - 36 : hy + 36;
     s += st.loc === 0 ? "" : `<path class="here" d="M${hx},${py + (hy < 150 ? 6 : -6)} l-7,${hy < 150 ? -10 : 10} h14 Z"/>`;
+    // Earthing jumpers left in place, marked where they are
+    st.jumpers.forEach((jp, i) => {
+      if (!jp) return;
+      const [x, y] = jp.loc === 0 ? [88, 112] : placeOf(jp.loc), dx = i * 10;
+      s += `<g class="jmark" transform="translate(${x + 16 + dx},${jp.loc === 0 ? y : y < 150 ? y - 16 : y + 16})"><path d="M0,-7 V0 M-7,0 H7 M-4.5,4 H4.5 M-2,8 H2"/></g>`;
+    });
     if (st.done) st.faults.forEach(f => {
       const [x, y] = f.kind === "span" ? [(P[f.k][0] + P[f.k + 1][0]) / 2, (P[f.k][1] + P[f.k + 1][1]) / 2] : P[f.j];
-      s += `<g class="fault"><circle cx="${x}" cy="${y}" r="17"/><path d="M${x + 3},${y - 11} L${x - 6},${y + 2} L${x},${y + 2} L${x - 3},${y + 11} L${x + 6},${y - 2} L${x},${y - 2} Z"/></g>`;
+      s += OPEN ? `<g class="fault"><circle cx="${x}" cy="${y}" r="17"/><path class="brk" d="M${x - 11},${y} H${x - 3} l2,-6 M${x + 11},${y} H${x + 3} l-2,6"/></g>`
+        : `<g class="fault"><circle cx="${x}" cy="${y}" r="17"/><path d="M${x + 3},${y - 11} L${x - 6},${y + 2} L${x},${y + 2} L${x - 3},${y + 11} L${x + 6},${y - 2} L${x},${y - 2} Z"/></g>`;
     });
     s += `<text class="lab small" x="20" y="288">${esc(T("Outgoing leg: bases 1–{m} · return leg: bases {m1}–{n} · click a base to walk there", { m, m1: m + 1, n: N }))}</text>`;
     return s;
@@ -450,8 +618,8 @@
       <rect class="cab" x="40" y="345" width="170" height="320" rx="6"/>
       <text class="lab" x="125" y="372" text-anchor="middle">CCR</text>
       <rect class="ccr-disp" x="70" y="385" width="110" height="32" rx="4"/>
-      <text class="ccr-t" x="125" y="407" text-anchor="middle">${esc(live ? T("Step {n}", { n: 3 }) : T("OFF"))}</text>`;
-    if (live) s += `<circle class="alarm" cx="125" cy="438" r="8"/><text class="lab small" x="125" y="465" text-anchor="middle">${esc(T("Earth fault"))}</text>`;
+      <text class="ccr-t" x="125" y="407" text-anchor="middle">${esc(live ? (OPEN ? T("Tripped") : T("Step {n}", { n: 3 })) : T("OFF"))}</text>`;
+    if (live) s += `<circle class="alarm" cx="125" cy="438" r="8"/><text class="lab small" x="125" y="465" text-anchor="middle">${esc(OPEN ? T("Open circuit") : T("Earth fault"))}</text>`;
     s += `<g class="act-g"${btn("isolate", "", T("Input breaker: switch off and lock out"))}>
       <rect class="brk" x="88" y="478" width="74" height="104" rx="6"/>
       <rect class="brk-h${live ? " on" : ""}" x="113" y="${live ? 490 : 536}" width="24" height="34" rx="4"/>
@@ -485,18 +653,24 @@
   /* What a failed part looks like once the base is open. A wet connector shows a split boot with
      carbon tracking to the can wall, a dry crack only a hairline, and a failed transformer a scorched,
      swollen and cracked case. Buried cable faults cannot be seen from a base. */
-  const connFault = (j, s) => st.faults.find(f => !f.fixed && f.kind === "conn" && f.j === j && f.s === s);
-  const txrFault = j => st.faults.some(f => !f.fixed && f.kind === "txr" && f.j === j);
+  const connFault = (j, s) => !OPEN && st.faults.find(f => !f.fixed && f.kind === "conn" && f.j === j && f.s === s);
+  const openConn = (j, s) => OPEN && st.faults.find(f => !f.fixed && f.kind === "conn" && f.j === j && f.s === s);
+  // In the open-circuit game only a transformer that burnt open visibly shows it
+  const txrFault = j => st.faults.some(f => !f.fixed && f.kind === "txr" && f.j === j && (!OPEN || f.vis));
 
   function connLook(j, s) {
     const p = pointName(j + s), w = st.wear.get(j);
+    const o = openConn(j, s);
+    if (o && o.how === "pulled") return T("The connector towards {p} has pulled apart inside its boot: the pin is out of the socket.", { p });
+    if (o && st.unplugged.has(j + ":" + s)) return T("The contact pin of the connector towards {p} is burnt away.", { p });
     if (connFault(j, s)) return connFault(j, s).hv ? T("There is a fine hairline crack in the cable-side boot of the connector towards {p}.", { p })
       : T("The cable-side boot of the connector towards {p} is split, with black carbon tracking from the crack to the can wall.", { p });
     if (w.tape === s) return T("The connector towards {p} is wrapped in old tape. Untidy, but that alone is no proof of a fault.", { p });
     return "";
   }
   function txrLook(j) {
-    if (txrFault(j)) return T("The transformer case is scorched, swollen and cracked, with potting compound oozing out.");
+    if (txrFault(j)) return OPEN ? T("The transformer case is scorched and swollen: the primary winding may have burnt open.")
+      : T("The transformer case is scorched, swollen and cracked, with potting compound oozing out.");
     if (st.wear.get(j).rust) return T("There is surface rust on the transformer case.");
     return "";
   }
@@ -515,6 +689,10 @@
     if (st.wear.get(j).tape === sd) {
       for (let v = 154; v < end - 4; v += 7) s += `<rect class="tape" x="${Math.min(x(v), x(v + 4))}" y="549" width="4" height="22" rx="1"/>`;
     }
+    const o = openConn(j, sd);
+    if (o && o.how === "pulled" && !un) s += `<rect class="pullgap" x="${Math.min(x(180), x(192))}" y="548" width="12" height="24"/>
+      <path class="pin" d="M${x(176)},560 H${x(194)}"/>`;
+    if (o && (o.how === "pulled" || un)) s += `<rect class="burntpin" x="${Math.min(x(un ? 162 : 174), x(un ? 168 : 180))}" y="553" width="6" height="14" rx="2"/>`;
     if (connFault(j, sd)) {
       const cx = x(un ? 160 : 166);
       if (connFault(j, sd).hv) s += `<path class="crack thin" d="M${cx},552 l2,5 l-2,4 l2,5"/>`;
@@ -584,6 +762,10 @@
   }
 
   function faultName(f) {
+    if (OPEN) return f.kind === "conn" ? (f.how === "pulled" ? T("a pulled-apart connector in base {n}, on the side towards {p}", { n: f.j, p: pointName(f.j + f.s) })
+      : T("a connector with a burnt-open contact in base {n}, on the side towards {p}", { n: f.j, p: pointName(f.j + f.s) }))
+      : f.kind === "txr" ? T("a transformer with an open primary winding in base {n}", { n: f.j })
+        : T("a broken cable between {a} and {b}", { a: pointName(f.k), b: pointName(f.k + 1) });
     const where = f.kind === "conn" ? T("a waterlogged connector in base {n}, on the side towards {p}", { n: f.j, p: pointName(f.j + f.s) })
       : f.kind === "txr" ? T("a failed isolating transformer in base {n}", { n: f.j })
         : f.cut ? T("a dead short: cable cut through between {a} and {b}", { a: pointName(f.k), b: pointName(f.k + 1) })
@@ -596,9 +778,9 @@
       <text class="ins-title" x="30" y="390">${esc(T(st.faults.length > 1 ? "All faults cleared in {h} h {m} min" : "Fault cleared in {h} h {m} min", { h: Math.floor(st.minutes / 60), m: Math.round(st.minutes % 60) }))}</text>`;
     let y = 418;
     const add = (text, cls, max, lh) => { const w = wrap(text, 30, y, max || 62, cls, lh || 22); s += w.svg; y += w.h + 6; };
-    if (st.faults.length === 1) add(T("The short was {where}.", { where: faultName(st.faults[0]) }), "lab");
+    if (st.faults.length === 1) add(OPEN ? T("The break was {where}.", { where: faultName(st.faults[0]) }) : T("The short was {where}.", { where: faultName(st.faults[0]) }), "lab");
     else {
-      add(T("There were {n} faults:", { n: st.faults.length }), "lab");
+      add(OPEN ? T("There were {n} breaks:", { n: st.faults.length }) : T("There were {n} faults:", { n: st.faults.length }), "lab");
       st.faults.forEach((f, i) => add(`${i + 1}. ${faultName(f)}`, "lab small", 70, 18));
     }
     add(T("Par for this circuit, splitting it in half each time, is about {p} min.", { p: st.par }) + " " +
@@ -612,12 +794,18 @@
     const res = st.result, testing = st.testing, dis = st.dis > 0;
     const status = testing ? T("Testing") : dis ? T("Discharging") : res ? T("Last reading") : T("Ready");
     const big = testing ? fmtR(st.reading) : res ? fmtR(res.r) : "– – –";
-    const sub = testing ? `${iso(st.volt + " V")} · ${T("output")} ${iso(Math.round(st.vOut) + " V")} · ${iso(mmss(st.t))}`
+    const sub = st.volt === 0 ? `${T("Continuity")} · ${iso("200 mA")} · ${iso(mmss(testing ? st.t : res ? res.t : 0))}`
+      : testing ? `${iso(st.volt + " V")} · ${T("output")} ${iso(Math.round(st.vOut) + " V")} · ${iso(mmss(st.t))}`
       : dis ? T("Discharging the cable: {v}", { v: iso(Math.round(st.vDis * st.dis) + " V") })
         : res ? `${iso(st.volt + " V")} · ${iso(mmss(res.t))}` : `${iso(st.volt + " V")}`;
     let s = `<text class="lcd-s${testing ? " live" : ""}" x="620" y="358">${esc(status)}</text>
       <text class="lcd-big" x="960" y="410" text-anchor="end">${esc(big)}</text>
       <text class="lcd-s" x="620" y="436">${esc(sub)}</text>`;
+    if (st.volt === 0) {
+      return s + `<text class="gl big" x="790" y="502" text-anchor="middle">${esc(T("Low-ohm continuity range"))}</text>
+        <text class="gl" x="790" y="526" text-anchor="middle">${esc(T("No charging: the reading is instant. OL means open."))}</text>
+        <text class="lab tiny ink" x="610" y="580">${esc(T("Drag the clips onto terminals, then press TEST."))}</text>`;
+    }
     // Reading against time, on a log scale from 10 kΩ to 100 GΩ
     const curve = testing || dis || res ? st.curve : [];
     const tmax = Math.max(90, ...curve.map(c => c[0]));
@@ -638,15 +826,15 @@
       <text class="ins-name" x="610" y="325">${esc(T("Insulation tester"))}</text>
       <rect class="lcd" x="606" y="336" width="368" height="112" rx="8"/>
       <rect class="graph" x="606" y="456" width="368" height="104" rx="6"/>`;
-    const ang = v => (-90 + VOLTS.indexOf(v) * 45) * Math.PI / 180;
-    s += `<g class="act-g knob"${btn("knob", "", T("Test voltage {v}, click to change", { v: st.volt + " V" }))}><circle cx="750" cy="640" r="26"/>
+    const ang = v => (-100 + VOLTS.indexOf(v) * 40) * Math.PI / 180;
+    s += `<g class="act-g knob"${btn("knob", "", T("Test voltage {v}, click to change", { v: st.volt === 0 ? "Ω" : st.volt + " V" }))}><circle cx="750" cy="640" r="26"/>
       <path class="knob-p" d="M750,640 L${750 + 22 * Math.sin(ang(st.volt))},${640 - 22 * Math.cos(ang(st.volt))}"/></g>`;
     VOLTS.forEach(v => {
       const a = ang(v), x = 750 + 46 * Math.sin(a), y = 640 - 46 * Math.cos(a) + 4;
-      s += `<g class="act-g vsel${v === st.volt ? " on" : ""}"${btn("volt", v, v + " V")}><circle class="hit" cx="${x}" cy="${y - 4}" r="13"/>
-        <text x="${x}" y="${y}" text-anchor="middle">${v >= 1000 ? v / 1000 + "k" : v}</text></g>`;
+      s += `<g class="act-g vsel${v === st.volt ? " on" : ""}"${btn("volt", v, v === 0 ? T("continuity") : v + " V")}><circle class="hit" cx="${x}" cy="${y - 4}" r="13"/>
+        <text x="${x}" y="${y}" text-anchor="middle">${vName(v)}</text></g>`;
     });
-    s += `<text class="lab tiny" x="750" y="684" text-anchor="middle">${esc(T("Test voltage"))}</text>
+    s += `<text class="lab tiny" x="750" y="684" text-anchor="middle">${esc(T("Range"))}</text>
       <g class="act-g testbtn${testing ? " on" : ""}"${btn("test", "", testing ? T("Stop the test") : T("Start the test"))}>
       <circle cx="890" cy="636" r="30"/><text x="890" y="641" text-anchor="middle">${esc(testing ? T("STOP") : T("TEST"))}</text></g>
       <text class="lab tiny" x="890" y="684" text-anchor="middle">${esc(T("press to start or stop"))}</text>
@@ -656,8 +844,16 @@
     return s;
   }
 
+  const EARTHPT = () => (st.loc === 0 ? [495, 607] : [290, 650]);
   function clipPos(c) {
     if (st.drag && st.drag.c === c) return [st.drag.x, st.drag.y];
+    if (c[0] === "j") {
+      const jp = st.jumpers[+c[1]];
+      if (!jp) return JPARK[+c[1]];
+      if (jp.loc !== st.loc) return null;
+      const t = terms().find(x => x.id === jp.term);
+      return t ? [t.x - 24, t.y - 28] : null;
+    }
     const t = st.clips[c] && terms().find(x => x.id === st.clips[c]);
     if (!t) return PARK[c];
     return c === "black" && st.clips.red === st.clips.black ? [t.x + 12, t.y + 12] : [t.x, t.y];
@@ -670,6 +866,19 @@
       const sag = Math.min(694, Math.max(jy, y) + 50);
       s += `<path class="lead ${c}" d="M${jx},${jy} C${jx - 40},${sag} ${x + 30},${sag} ${x},${y}"/>`;
     });
+    if (OPEN) {
+      s += `<text class="lab tiny jtray" x="112" y="684">${esc(T("Earthing jumpers"))}</text>`;
+      [0, 1].forEach(i => {
+        const c = "j" + i, pos = clipPos(c);
+        if (!pos) return;
+        const [x, y] = pos, jp = st.jumpers[i];
+        const [ex, ey] = EARTHPT();
+        if ((jp && jp.loc === st.loc) || (st.drag && st.drag.c === c)) s += `<path class="jlead" d="M${ex},${ey} Q${(ex + x) / 2},${Math.max(ey, y) + 30} ${x},${y}"/>`;
+        const label = T("Earthing jumper") + (jp ? ", " + termInfo(jp.term).label : "");
+        s += `<g class="clip jumper${st.armed === c ? " armed" : ""}" data-clip="${c}" data-key="clip|${c}" tabindex="0" role="button" aria-label="${esc(label)}" transform="translate(${x},${y})">
+          <circle class="clip-hit" r="15"/><path class="jaw" d="M-10,-3 L9,-9 L11,-4 L-5,0 Z M-10,3 L9,9 L11,4 L-5,0 Z"/><circle class="boot" cx="-9" r="6"/></g>`;
+      });
+    }
     ["black", "red"].forEach(c => {
       const [x, y] = clipPos(c);
       const label = (c === "red" ? T("LINE") : T("EARTH")) + " " + T("clip") + (st.clips[c] ? ", " + termInfo(st.clips[c]).label : "");
@@ -706,14 +915,14 @@
       const t = i * Math.PI / 5, r1 = 14, r2 = i % 2 ? 30 : 44;
       rays += `M${(x + r1 * Math.cos(t)).toFixed(1)},${(y + r1 * Math.sin(t)).toFixed(1)} L${(x + r2 * Math.cos(t + 0.15)).toFixed(1)},${(y + r2 * Math.sin(t + 0.15)).toFixed(1)} `;
     }
-    return `<defs><pattern id="fg-hazard" width="20" height="20" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+    return `<defs><pattern id="${host.id}-hazard" width="20" height="20" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
         <rect width="20" height="20" fill="#ffcc00"/><rect width="10" height="20" fill="#111417"/></pattern></defs>
       <rect class="al-flash" x="0" y="0" width="1000" height="700"/>
       <g class="al-spark" style="transform-origin: ${x}px ${y}px">
         <circle class="al-ring" cx="${x}" cy="${y}" r="24"/><path class="al-rays" d="${rays}"/>
         <path class="al-bolt" d="M${x + 4},${y - 16} L${x - 8},${y + 2} L${x},${y + 2} L${x - 4},${y + 16} L${x + 9},${y - 3} L${x + 1},${y - 3} Z"/></g>
       <g class="al-card" data-dismiss="1" role="alert" aria-label="${esc(T("Safety incident") + ": " + a.text)}">
-        <rect class="al-border" x="${bx}" y="${by}" width="480" height="${h}" rx="10"/>
+        <rect class="al-border" x="${bx}" y="${by}" width="480" height="${h}" rx="10" fill="url(#${host.id}-hazard)"/>
         <rect class="al-body" x="${bx + 8}" y="${by + 8}" width="464" height="${h - 16}" rx="6"/>
         <path class="al-tri" d="M${bx + 40},${by + 18} l17,30 h-34 Z"/><text class="al-excl" x="${bx + 40}" y="${by + 44}" text-anchor="middle">!</text>
         <text class="al-title" x="${bx + 68}" y="${by + 42}">${esc(T("Safety incident"))}</text>
@@ -726,7 +935,7 @@
     const g = group("alert");
     g.innerHTML = alertSvg();
     AGL.bidiSvg(g);
-    const map = svg.closest(".fg-map"), host = document.getElementById("fg");
+    const map = svg.closest(".fg-map");
     if (st.alert) {
       [map, host.querySelector(".fg-stats")].forEach(el => { el.classList.remove("fg-shake"); void el.getBoundingClientRect(); el.classList.add("fg-shake"); });
     }
@@ -742,8 +951,7 @@
   }
 
   function render() {
-    const host = document.getElementById("fg");
-    if (!host || !st.faults || !svg) return;
+    if (!st.faults || !svg) return;
     const key = document.activeElement && svg.contains(document.activeElement) ? document.activeElement.dataset.key : null;
     group("map").innerHTML = mapSvg();
     group("inset").innerHTML = `<rect class="ins-bg" x="10" y="298" width="564" height="392" rx="10"/>` +
@@ -766,12 +974,13 @@
     ];
     host.querySelector(".fg-stats").innerHTML = pills.map(([k, v], i) =>
       `<div class="readout${i === 4 && st.warnings ? " warn" : ""}"><span class="k">${esc(k)}</span><span class="v"><bdi dir="ltr">${esc(v)}</bdi></span></div>`).join("");
-    const pill = { low: ["on-bad", T("Low")], good: ["on-ok", T("Good")], unsettled: ["", T("Not settled")], open: ["", T("Open")], info: ["", T("Check")] };
+    const pill = { low: ["on-bad", T("Low")], good: ["on-ok", T("Good")], unsettled: ["", T("Not settled")], leads: ["", T("Lead off")], info: ["", T("Check")],
+      cont: ["on-ok", T("Continuous")], ol: ["on-bad", T("Break")] };
     host.querySelector(".fg-log").innerHTML = st.log.length
       ? st.log.map(l => `<li><span class="pill ${pill[l.kind][0]}">${esc(pill[l.kind][1])}</span> <span>${esc(l.text)}</span></li>`).join("")
       : `<li class="muted">${esc(T("No measurements yet."))}</li>`;
-    host.querySelectorAll("#fg-level button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.level === st.level)));
-    host.querySelectorAll("#fg-diff button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.diff === st.diff)));
+    host.querySelectorAll(".fg-level button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.level === st.level)));
+    host.querySelectorAll(".fg-diff button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.diff === st.diff)));
   }
 
   /* ---------- Input ---------- */
@@ -785,14 +994,19 @@
 
   function grabBlocked(c) {
     if (st.done) return true;
-    if (st.testing) { warn(T("Never touch the leads or connectors during a test: the cable is charged to the test voltage."), clipPos(c)); render(); return true; }
-    if (st.dis > 0) { warn(T("Wait for the tester to discharge the cable before you touch the leads or connectors."), clipPos(c)); render(); return true; }
+    if (st.testing || st.dis > 0) { touchDuringTest(clipPos(c)); render(); return true; }
     return false;
   }
 
-  AGL.initFaultGame = function () {
-    const host = document.getElementById("fg");
-    if (!host) return;
+  // Take a clip or jumper off: tester clips go back by the tester, jumpers back to the tray
+  function unclip(c) {
+    if (c[0] === "j") {
+      if (st.jumpers[+c[1]]) say("info", T("Earthing jumper removed."));
+      st.jumpers[+c[1]] = null;
+    } else st.clips[c] = null;
+  }
+
+  {
     host.querySelector(".fg-map").innerHTML = `<svg viewBox="0 0 1000 700" class="fg" role="group" style="aspect-ratio: 1000 / 700">
       <g class="g-map"></g><g class="g-inset"></g><g class="g-instr"></g><g class="g-lcd"></g><g class="g-leads"></g><g class="g-alert"></g></svg>`;
     svg = host.querySelector("svg.fg");
@@ -806,7 +1020,7 @@
       const clip = e.target.closest(".clip");
       if (clip && (e.key === "Delete" || e.key === "Backspace")) {
         e.preventDefault();
-        if (!grabBlocked(clip.dataset.clip)) { st.clips[clip.dataset.clip] = null; st.armed = null; render(); }
+        if (!grabBlocked(clip.dataset.clip)) { unclip(clip.dataset.clip); st.armed = null; render(); }
         return;
       }
       if (e.key !== "Enter" && e.key !== " ") return;
@@ -839,29 +1053,32 @@
       if (!d.moved) { st.armed = st.armed === d.c ? null : d.c; render(); return; }
       let best = null, bd = 40;
       terms().forEach(t => { const dd = Math.hypot(t.x - d.x, t.y - d.y); if (dd < bd) { bd = dd; best = t; } });
-      if (best) {
-        placeClip(d.c, best.id);
-        say("info", T("{lead} lead clipped on {where}.", { lead: d.c === "red" ? T("LINE") : T("EARTH"), where: termInfo(best.id).label }));
-      } else st.clips[d.c] = null;
+      if (best) placeClip(d.c, best.id);
+      else unclip(d.c);
       render();
     };
     svg.addEventListener("pointerup", drop);
     svg.addEventListener("pointercancel", drop);
 
-    host.querySelector("#fg-level").addEventListener("click", e => {
+    host.querySelector(".fg-level").addEventListener("click", e => {
       const b = e.target.closest("button");
       if (!b) return;
       st.level = b.dataset.level;
       newGame();
     });
-    host.querySelector("#fg-diff").addEventListener("click", e => {
+    host.querySelector(".fg-diff").addEventListener("click", e => {
       const b = e.target.closest("button");
       if (!b) return;
       st.diff = b.dataset.diff;
       newGame();
     });
-    host.querySelector("#fg-new").addEventListener("click", newGame);
+    host.querySelector(".fg-new").addEventListener("click", newGame);
     newGame();
     AGL.onLang(render);
+  }
+  }
+
+  AGL.initFaultGame = function () {
+    document.querySelectorAll(".fg-game[data-mode]").forEach(h => Game(h, h.dataset.mode));
   };
 })();

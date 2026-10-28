@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Hebrew:wght@400;500;600&family=Heebo:wght@500;700;800&display=swap">
 <!-- Bump ?v= on every release so browsers and CDNs fetch the new CSS and JS -->
-<link rel="stylesheet" href="css/agl.css?v=20261102">
+<link rel="stylesheet" href="css/agl.css?v=20261103">
 </head>
 <body>
 
@@ -619,23 +619,65 @@
             <p>Tip: hold a test for a full minute to get the polarization index. Healthy insulation keeps rising (PI about 2); a wet fault stays flat. Some faults are dry cracks that only show at 2500 V or more. When you open a base, look before you test: a burnt, tracked connector boot or a scorched, swollen transformer gives the fault away. Old tape, rust and mud look bad but are usually harmless, and a buried cable fault cannot be seen at all.</p>
           </div>
         </details>
-        <div id="fg" class="fg-game">
+        <div id="fg" class="fg-game" data-mode="short">
           <div class="controls">
             <span class="ctl-label">Circuit size
-              <span class="seg" id="fg-level">
+              <span class="seg fg-level" id="fg-level">
                 <button type="button" data-level="easy" aria-pressed="false">12 bases</button>
                 <button type="button" data-level="normal" aria-pressed="true">24 bases</button>
                 <button type="button" data-level="hard" aria-pressed="false">40 bases</button>
               </span>
             </span>
             <span class="ctl-label">Difficulty
-              <span class="seg" id="fg-diff">
+              <span class="seg fg-diff" id="fg-diff">
                 <button type="button" data-diff="easy" aria-pressed="false">Easy</button>
                 <button type="button" data-diff="medium" aria-pressed="true">Medium</button>
                 <button type="button" data-diff="hard" aria-pressed="false">Hard</button>
               </span>
             </span>
-            <button type="button" class="btn" id="fg-new">New fault</button>
+            <button type="button" class="btn fg-new" id="fg-new">New fault</button>
+          </div>
+          <div class="readouts fg-stats"></div>
+          <p class="scroll-hint">Swipe the diagram sideways to see all of it.</p>
+          <div class="feedback fg-msg info" aria-live="polite"></div>
+          <div class="sld-wrap fg-map"></div>
+          <div class="panel"><h4>Measurements</h4><ol class="fg-log"></ol></div>
+        </div>
+      </article>
+
+      <article class="lesson">
+        <h3>Find the open circuit</h3>
+        <p class="lede-small">The CCR on a runway edge circuit trips on open circuit and every light is out: the loop is broken somewhere. Make it safe, bond one end of the loop to earth with an earthing jumper, then work along the circuit with the tester on its continuity range until you find the break.</p>
+        <details class="more">
+          <summary>How to play</summary>
+          <div class="prose">
+            <ol>
+              <li>In the vault, switch off and lock out the CCR and pull the series cutout plug. Set the tester to Ω and measure from field OUT to field RET: OL confirms the loop is open.</li>
+              <li>Drag an earthing jumper from the tray onto field OUT. That end of the loop is now bonded to earth, and the jumper stays there when you walk away.</li>
+              <li>At a base, open it, unplug a connector and measure from the cable side to the can earth. A low reading means the conductor is unbroken all the way back to the jumper; OL means the break is between here and the vault.</li>
+              <li>Plug the connector back in before you move on, or the next reading will stop at that split. Keep halving the circuit until you know which cable, connector or transformer is open. To test a transformer directly, unplug both sides and measure across its two leads.</li>
+              <li>Repair it, plug everything back in, take off every jumper and prove the loop from OUT to RET.</li>
+            </ol>
+            <p>Difficulty: on Easy a broken part inside a base can be seen when you open it. On Medium about half cannot: a burnt-open contact only shows when the connector is unplugged, and a burnt-open winding only shows on the meter. Hard has two or three breaks: from one jumper you can only see as far as the first one, so move the jumper or use a second one from the RET side.</p>
+          </div>
+        </details>
+        <div id="fo" class="fg-game" data-mode="open">
+          <div class="controls">
+            <span class="ctl-label">Circuit size
+              <span class="seg fg-level">
+                <button type="button" data-level="easy" aria-pressed="false">12 bases</button>
+                <button type="button" data-level="normal" aria-pressed="true">24 bases</button>
+                <button type="button" data-level="hard" aria-pressed="false">40 bases</button>
+              </span>
+            </span>
+            <span class="ctl-label">Difficulty
+              <span class="seg fg-diff">
+                <button type="button" data-diff="easy" aria-pressed="false">Easy</button>
+                <button type="button" data-diff="medium" aria-pressed="true">Medium</button>
+                <button type="button" data-diff="hard" aria-pressed="false">Hard</button>
+              </span>
+            </span>
+            <button type="button" class="btn fg-new">New fault</button>
           </div>
           <div class="readouts fg-stats"></div>
           <p class="scroll-hint">Swipe the diagram sideways to see all of it.</p>
@@ -748,20 +790,20 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="js/data.js?v=20261102"></script>
-<script src="js/detail-data.js?v=20261102"></script>
-<script src="js/vault-data.js?v=20261102"></script>
-<script src="js/he.js?v=20261102"></script>
-<script src="js/he-static.js?v=20261102"></script>
-<script src="js/i18n.js?v=20261102"></script>
-<script src="js/airfield.js?v=20261102"></script>
-<script src="js/circuit.js?v=20261102"></script>
-<script src="js/calc.js?v=20261102"></script>
-<script src="js/learn.js?v=20261102"></script>
-<script src="js/detail3d.js?v=20261102"></script>
-<script src="js/vault.js?v=20261102"></script>
-<script src="js/vault3d.js?v=20261102"></script>
-<script src="js/faultgame.js?v=20261102"></script>
-<script src="js/app.js?v=20261102"></script>
+<script src="js/data.js?v=20261103"></script>
+<script src="js/detail-data.js?v=20261103"></script>
+<script src="js/vault-data.js?v=20261103"></script>
+<script src="js/he.js?v=20261103"></script>
+<script src="js/he-static.js?v=20261103"></script>
+<script src="js/i18n.js?v=20261103"></script>
+<script src="js/airfield.js?v=20261103"></script>
+<script src="js/circuit.js?v=20261103"></script>
+<script src="js/calc.js?v=20261103"></script>
+<script src="js/learn.js?v=20261103"></script>
+<script src="js/detail3d.js?v=20261103"></script>
+<script src="js/vault.js?v=20261103"></script>
+<script src="js/vault3d.js?v=20261103"></script>
+<script src="js/faultgame.js?v=20261103"></script>
+<script src="js/app.js?v=20261103"></script>
 </body>
 </html>

@@ -1100,7 +1100,7 @@ input[type="range"] { accent-color: var(--accent-fill); min-height: var(--tap); 
 .fg .al-ring { fill: #ff2a1a; fill-opacity: 0.35; stroke: #ff2a1a; stroke-width: 3; animation: fg-ring 0.9s ease-out infinite; transform-box: fill-box; transform-origin: center; }
 .fg .al-rays { stroke: #ffe14d; stroke-width: 4; stroke-linecap: round; fill: none; }
 .fg .al-bolt { fill: #ffe14d; stroke: #111417; stroke-width: 1.5; }
-.fg .al-border { fill: url(#fg-hazard); stroke: #111417; stroke-width: 2; }
+.fg .al-border { stroke: #111417; stroke-width: 2; }
 .fg .al-body { fill: #fffdf5; }
 .fg .al-tri { fill: #ffcc00; stroke: #111417; stroke-width: 2.5; stroke-linejoin: round; }
 .fg .al-excl { font-family: var(--f-display); font-weight: 800; font-size: 20px; fill: #111417; }
@@ -1120,4 +1120,14 @@ input[type="range"] { accent-color: var(--accent-fill); min-height: var(--tap); 
   .fg .al-card, .fg .al-spark, .fg .al-ring, .fg-map.fg-shake { animation: none; }
   .fg .al-flash { animation: none; opacity: 0.12; }
 }
+/* Open-circuit game: earthing jumpers, pulled and burnt connectors, breaks */
+.fg .clip.jumper .jaw, .fg .clip.jumper .boot { fill: #2e9e44; stroke: #ffd400; stroke-width: 2; }
+.fg .jlead { fill: none; stroke: #2e9e44; stroke-width: 4; stroke-dasharray: 9 6; stroke-linecap: round; pointer-events: none; }
+.fg .jtray { fill: var(--ink); }
+.fg .jmark path { fill: none; stroke: #2e9e44; stroke-width: 2.5; stroke-linecap: round; }
+.fg .fault .brk { fill: none; stroke: var(--bad); stroke-width: 3; stroke-linecap: round; }
+.fg .pullgap { fill: #aab3ba; pointer-events: none; }
+.fg .pin { stroke: #c9a24a; stroke-width: 2.5; pointer-events: none; }
+.fg .burntpin { fill: #1a0d05; stroke: #e0662b; stroke-width: 1.5; pointer-events: none; }
+.fg .gl.big { font-size: 15px; font-weight: 600; fill: #b6f06a; }
 @media (max-width: 860px) { .fg-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
