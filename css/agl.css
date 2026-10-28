@@ -1023,15 +1023,25 @@ input[type="range"] { accent-color: var(--accent-fill); min-height: var(--tap); 
 .fg .bolt { fill: #6d7880; stroke: var(--ink); }
 .fg .fixture { fill: #f2c14e; stroke: var(--ink); }
 .fg .lens { fill: var(--l-white); stroke: var(--ink); }
-.fg .can-in { fill: #3a4148; stroke: #8b959d; stroke-width: 8; }
+.fg .can-in { fill: #aab3ba; stroke: #6d7880; stroke-width: 8; }
 .fg .water { fill: #2f7fd0; fill-opacity: 0.45; }
 .fg .txr { fill: #2a3138; stroke: #8b959d; stroke-width: 2; }
 .fg .txr + text, .fg .txr ~ text { fill: #e8edf1; }
-.fg .can-in ~ .lab { fill: #e8edf1; }
-.fg .can-in ~ .lab.hint { fill: var(--accent-fill); }
+.fg .can-in ~ .lab { fill: #15202a; }
+.fg .can-in ~ .lab.hint { fill: #6b4500; }
+.fg .can-in ~ .wire, .fg .can-in ~ .lead-w { stroke: #15202a; }
 .fg .conn { fill: #111; stroke: #9aa5ae; }
 .fg .conn.t { fill: #2c2c2c; }
-.fg .conn.burnt { fill: #3b1d0e; stroke: #e0662b; stroke-width: 2.5; stroke-dasharray: 3 2; }
+.fg .scorch { fill: #3a1a08; fill-opacity: 0.7; pointer-events: none; }
+.fg .scorch.on-txr { fill: #7a3410; fill-opacity: 0.9; }
+.fg .crack { fill: none; stroke: #ff9a4d; stroke-width: 2.5; stroke-linejoin: round; pointer-events: none; }
+.fg .crack.thin { stroke-width: 1.6; stroke: #f6e3c8; }
+.fg .track { fill: none; stroke: #0a0a0a; stroke-width: 2.5; stroke-linecap: round; pointer-events: none; }
+.fg .tar { fill: #6b4513; stroke: #2b1a08; }
+.fg .look .lab { fill: #e8edf1; }
+.fg .tape { fill: #6b6f73; pointer-events: none; }
+.fg .rust circle { fill: #b5561c; fill-opacity: 0.85; }
+.fg .mud { fill: #6b4a2b; fill-opacity: 0.7; }
 .fg .act-g:hover .plate, .fg .act-g:focus-visible .plate, .fg .act-g:hover .cut-plug, .fg .act-g:focus-visible .cut-plug, .fg .act-g:hover .brk, .fg .act-g:focus-visible .brk { stroke: var(--accent); stroke-width: 3; }
 .fg .plug:hover .conn, .fg .plug:focus-visible .conn { stroke: var(--accent-fill); stroke-width: 2.5; }
 .fg .chip rect { fill: var(--surface); stroke: var(--accent); stroke-width: 1.5; }

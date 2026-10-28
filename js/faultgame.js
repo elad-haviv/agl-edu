@@ -34,11 +34,16 @@
     else { const k = rnd(N + 1); fault = { kind: "span", k, p: k + 0.5, r0: 0.05 + Math.random() * 0.4 }; }
     // Some faults are dry cracks that only break down at a high test voltage
     fault.hv = st.level !== "easy" && fault.kind !== "txr" && Math.random() < 0.3;
+    // Harmless wear that looks worrying: old tape on a joint, rust, mud
+    const wear = new Map();
+    for (let j = 1; j <= N; j++) {
+      wear.set(j, { tape: Math.random() < 0.2 ? (Math.random() < 0.5 ? -1 : 1) : 0, rust: Math.random() < 0.2, mud: Math.random() < 0.2 });
+    }
     const wet = new Set();
     for (let j = 1; j <= N; j++) if (Math.random() < 0.15) wet.add(j);
     if (fault.kind !== "span" && Math.random() < 0.7) wet.add(fault.j);
     Object.assign(st, {
-      N, fault, wet, k: 0.8 + Math.random() * 0.5, isolated: false, cutout: false, lids: new Set(), unplugged: new Set(),
+      N, fault, wet, wear, k: 0.8 + Math.random() * 0.5, isolated: false, cutout: false, lids: new Set(), unplugged: new Set(),
       loc: 0, clips: { red: null, black: null }, armed: null, drag: null, testing: false, t: 0, curve: [], reading: Infinity,
       vOut: 0, dis: 0, vDis: 0, result: null, minutes: 0, warnings: 0, wrong: 0, tests: 0, opened: 0, log: [], measured: [],
       fixed: false, done: false
@@ -255,7 +260,7 @@
         st.loc = arg;
         st.clips = { red: null, black: null };
         st.armed = null;
-        say("info", arg === 0 ? T("You are in the vault.") : st.lids.has(arg) ? T("You are at base {n}. The base is open.", { n: arg })
+        say("info", arg === 0 ? T("You are in the vault.") : st.lids.has(arg) ? T("You are at base {n}. The base is open.", { n: arg }) + " " + observations(arg).join(" ")
           : T("You are at base {n}. Click the base plate to open it.", { n: arg }));
         break;
       }
@@ -277,7 +282,7 @@
         st.lids.add(j);
         st.opened++;
         st.minutes += COST.lid;
-        say("info", st.wet.has(j) ? T("Base open. There is water in the bottom of the can.") : T("Base open. The can is dry."));
+        say("info", T("Base open.") + " " + observations(j).join(" "));
         break;
       case "close":
         if ([-1, 1].some(s => st.unplugged.has(j + ":" + s))) { say("info", T("Plug both connectors back in before you close the base.")); break; }
@@ -293,8 +298,7 @@
         else {
           st.unplugged.add(key);
           st.minutes += COST.unplug;
-          say("info", T("Connector unplugged: the loop is split here. Clip a lead onto either side.") +
-            (burnt(j, arg) ? " " + T("The cable-side boot is blackened with tracking marks.") : ""));
+          say("info", T("Connector unplugged: the loop is split here. Clip a lead onto either side."));
         }
         checkClips();
         break;
@@ -440,8 +444,48 @@
     return s;
   }
 
-  // A failed connector shows tracking marks once it is pulled apart
-  const burnt = (j, s) => !st.fixed && st.fault.kind === "conn" && st.fault.j === j && st.fault.s === s;
+  /* What a failed part looks like once the base is open. A wet connector shows a split boot with
+     carbon tracking to the can wall, a dry crack only a hairline, and a failed transformer a scorched,
+     swollen and cracked case. Buried cable faults cannot be seen from a base. */
+  const connFault = (j, s) => !st.fixed && st.fault.kind === "conn" && st.fault.j === j && st.fault.s === s;
+  const txrFault = j => !st.fixed && st.fault.kind === "txr" && st.fault.j === j;
+
+  function connLook(j, s) {
+    const p = pointName(j + s), w = st.wear.get(j);
+    if (connFault(j, s)) return st.fault.hv ? T("There is a fine hairline crack in the cable-side boot of the connector towards {p}.", { p })
+      : T("The cable-side boot of the connector towards {p} is split, with black carbon tracking from the crack to the can wall.", { p });
+    if (w.tape === s) return T("The connector towards {p} is wrapped in old tape. Untidy, but that alone is no proof of a fault.", { p });
+    return "";
+  }
+  function txrLook(j) {
+    if (txrFault(j)) return T("The transformer case is scorched, swollen and cracked, with potting compound oozing out.");
+    if (st.wear.get(j).rust) return T("There is surface rust on the transformer case.");
+    return "";
+  }
+  function observations(j) {
+    const out = [st.wet.has(j) ? T("There is water in the bottom of the can.") : T("The can is dry.")];
+    if (st.wear.get(j).mud) out.push(T("Mud has washed in through the conduits."));
+    const parts = [connLook(j, -1), connLook(j, 1), txrLook(j)].filter(Boolean);
+    return out.concat(parts.length ? parts : [T("The connectors and the transformer look sound.")]);
+  }
+  const title = text => `<title>${esc(text)}</title>`;
+
+  // Damage and wear drawn over a connector's cable-side boot (x 150..168 or 150..186)
+  function connMarks(j, sd, un) {
+    const x = v => mx(sd, v), end = un ? 168 : 186;
+    let s = "";
+    if (st.wear.get(j).tape === sd) {
+      for (let v = 154; v < end - 4; v += 7) s += `<rect class="tape" x="${Math.min(x(v), x(v + 4))}" y="549" width="4" height="22" rx="1"/>`;
+    }
+    if (connFault(j, sd)) {
+      const cx = x(un ? 160 : 166);
+      if (st.fault.hv) s += `<path class="crack thin" d="M${cx},552 l2,5 l-2,4 l2,5"/>`;
+      else s += `<ellipse class="scorch" cx="${x(158)}" cy="560" rx="${un ? 16 : 22}" ry="15"/>
+        <path class="crack" d="M${cx},551 l3,5 l-3,4 l3,5 l-2,4"/>
+        <path class="track" d="M${cx},553 q${-sd * -6},-6 ${x(147) - cx},-9 M${cx},567 q${-sd * -5},6 ${x(147) - cx},10 M${x(156)},556 l${x(148) - x(156)},-3"/>`;
+    }
+    return s;
+  }
 
   function canSvg(j) {
     const open = st.lids.has(j);
@@ -460,20 +504,29 @@
         <text class="lab small hint" x="290" y="588" text-anchor="middle">${esc(T("Click to open it ({m} min)", { m: COST.lid }))}</text></g>`;
     }
     s += `<circle class="can-in" cx="290" cy="515" r="150"/>`;
+    if (st.wear.get(j).mud) s += `<path class="mud" d="M180,630 q40,-16 90,-4 q50,10 70,-2 q10,18 -40,26 q-70,8 -120,-20 Z"/>`;
     if (st.wet.has(j)) s += `<ellipse class="water" cx="290" cy="622" rx="118" ry="28"/>`;
     s += `<rect class="lug" x="278" y="642" width="24" height="14" rx="2"/>
       <text class="lab small" x="270" y="653" text-anchor="end">${esc(T("can earth"))}</text>
       <path class="wire" d="M275,420 V385 M305,420 V385"/><text class="lab small" x="290" y="378" text-anchor="middle">${esc(T("to the lamp"))}</text>
+      <g class="look">${title(txrLook(j) || T("Transformer case clean and intact."))}
+      ${txrFault(j) ? `<path class="txr" d="M343,426 Q374,452 343,480 Z"/>` : ""}
       <rect class="txr" x="235" y="420" width="110" height="64" rx="8"/>
+      ${st.wear.get(j).rust ? `<g class="rust"><circle cx="243" cy="428" r="5"/><circle cx="251" cy="426" r="3"/><circle cx="339" cy="477" r="4"/><circle cx="243" cy="476" r="3"/></g>` : ""}
+      ${txrFault(j) ? `<path class="scorch on-txr" d="M296,422 q20,-6 40,4 q12,16 4,34 q-6,20 -30,18 q-22,-2 -24,-22 q-6,-22 10,-34 Z"/>
+        <path class="scorch" d="M306,432 q14,-4 24,6 q6,12 0,22 q-10,10 -22,4 q-10,-8 -8,-20 Z"/>
+        <path class="crack" d="M302,420 l7,13 l-6,9 l8,12 l-4,8"/>
+        <path class="tar" d="M236,436 q-8,4 -7,18 q1,14 -2,30 q3,6 6,0 q1,-10 3,-16 Z"/>` : ""}
       <text class="lab" x="290" y="447" text-anchor="middle">L-830</text>
-      <text class="lab small" x="290" y="469" text-anchor="middle">${esc(T("transformer"))}</text>`;
+      <text class="lab small" x="290" y="469" text-anchor="middle">${esc(T("transformer"))}</text></g>`;
     s += chip(230, 492, 120, T("Replace ({m} min)", { m: COST.txr }), "fix-txr", "");
     [-1, 1].forEach(sd => {
       const un = st.unplugged.has(j + ":" + sd);
       const rect = (a, b, cls) => { const x1 = mx(sd, a), x2 = mx(sd, b); return `<rect class="${cls}" x="${Math.min(x1, x2)}" y="551" width="${Math.abs(x2 - x1)}" height="18" rx="5"/>`; };
       s += `<path class="lead-w" d="M${mx(sd, 235)},466 C${mx(sd, 205)},466 ${mx(sd, 255)},560 ${mx(sd, un ? 235 : 222)},560"/>
-        <g class="act-g plug"${btn("plug", sd, un ? T("Plug the connector back in") : T("Unplug the connector"))}>
-        ${rect(145, 242, "hit")}${un ? rect(150, 168, "conn c" + (burnt(j, sd) ? " burnt" : "")) + rect(217, 235, "conn t") : rect(150, 186, "conn c") + rect(186, 222, "conn t")}</g>`;
+        <g class="act-g plug"${btn("plug", sd, un ? T("Plug the connector back in") : T("Unplug the connector"))}>${title(connLook(j, sd) || T("Connector boots clean and intact."))}
+        ${rect(145, 242, "hit")}${un ? rect(150, 168, "conn c") + rect(217, 235, "conn t") : rect(150, 186, "conn c") + rect(186, 222, "conn t")}
+        ${connMarks(j, sd, un)}</g>`;
       if (un) s += `<text class="lab tiny" x="${mx(sd, 166)}" y="541" text-anchor="middle">${esc(T("cable"))}</text>
         <text class="lab tiny" x="${mx(sd, 221)}" y="541" text-anchor="middle">${esc(T("txr"))}</text>`;
       s += `<text class="lab tiny hint" x="${mx(sd, 194)}" y="588" text-anchor="middle">${esc(un ? T("click to plug in") : T("click to unplug"))}</text>`;
