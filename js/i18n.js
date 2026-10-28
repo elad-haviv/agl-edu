@@ -6,7 +6,7 @@
   // Containers whose content the modules render themselves in the current language
   const SKIP = "#airfield, #map-legend, #light-info, #sim, #sim-steps, #sim-readouts, #sim-alarms, #sim-log, " +
     "#calc-rows, #c-results, #c-notes, #c-size, #c-size-note, #ir-rows, #ir-chart, #ir-title, #lr-dev, #lr-text, " +
-    "#ts-pick, #ts-card, #quiz-card, #quiz-best, #gloss-list, #step-label, #fail-a, #fail-b, #lang-seg, #ir-more, #resume, " +
+    "#ts-pick, #ts-card, #quiz-card, #quiz-best, #gloss-list, #step-label, #fail-a, #fail-b, #lang-seg, #ir-more, #resume, #cv-total, #cv-total-note, #cv-results, #cv-draw, #cv-rows, #cv-line, #flows, " +
     ".crumb, .crumb-bar, .pager, .sublessons, .d3d, #vault-sld, #vault-sld-info, #vault-sim, #vault-sim-table, #vault-sim-status, " +
     "#vault-fail, #vault-gen-label, #vault-plan, #vault-plan-info, #vault-plan-list, #vault-3d, .fg-stats, .fg-map, .fg-msg, .fg-log, script, style";
   const ATTRS = ["aria-label", "placeholder", "title"];

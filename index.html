@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Hebrew:wght@400;500;600&family=Heebo:wght@500;700;800&display=swap">
 <!-- Bump ?v= on every release so browsers and CDNs fetch the new CSS and JS -->
-<link rel="stylesheet" href="css/agl.css?v=20261103">
+<link rel="stylesheet" href="css/agl.css?v=20261104">
 </head>
 <body>
 
@@ -575,6 +575,49 @@
           </div>
         </div>
       </article>
+
+      <article class="lesson">
+        <h3>Lights on a curve</h3>
+        <p class="lede-small">Work out how many lights a taxiway curve needs and where each one goes. Enter the radius and the angle the curve turns through; the maximum spacing comes from the radius rule or from your own standard.</p>
+        <div class="calc-layout">
+          <div class="grid-2">
+            <label class="field">Curve radius to the centreline (m)<input type="number" inputmode="decimal" id="cv-r" min="1" step="1" value="60"></label>
+            <label class="field">Angle the curve turns through (°)<input type="number" inputmode="decimal" id="cv-a" min="1" max="180" step="1" value="90"></label>
+            <label class="field">Lights to place
+              <select id="cv-on">
+                <option value="cl" selected>Centreline</option>
+                <option value="edges">Both edges</option>
+                <option value="all">Centreline and both edges</option>
+              </select>
+            </label>
+            <label class="field">Taxiway width (m)<input type="number" inputmode="decimal" id="cv-w" min="0" step="0.5" value="23"></label>
+            <label class="field">Spacing rule
+              <select id="cv-rule">
+                <option value="vis" selected>Centreline table, RVR 350 m or more</option>
+                <option value="low">Centreline table, RVR below 350 m</option>
+                <option value="own">My own maximum spacing</option>
+              </select>
+            </label>
+            <label class="field">Maximum spacing (m)<input type="number" inputmode="decimal" id="cv-s" min="1" step="0.5" value="15"></label>
+          </div>
+          <div class="panel result">
+            <span class="tag">Lights on the curve</span>
+            <div class="result-big num" id="cv-total">–</div>
+            <div class="small muted" id="cv-total-note"></div>
+            <table class="result-table"><tbody id="cv-results"></tbody></table>
+          </div>
+        </div>
+        <div class="panel cv-draw" id="cv-draw"></div>
+        <h4>Setting-out table</h4>
+        <div class="controls"><label class="field inline">Line<select id="cv-line"></select></label></div>
+        <div class="table-wrap">
+          <table class="cv-table">
+            <thead><tr><th>Light</th><th class="num">Arc from TP (m)</th><th class="num">Chord from TP (m)</th><th class="num">Deflection from tangent (°)</th><th class="num">Along tangent X (m)</th><th class="num">Offset Y (m)</th></tr></thead>
+            <tbody id="cv-rows"></tbody>
+          </table>
+        </div>
+        <p class="small muted">Lights are spaced equally along the arc, from tangent point (TP) to tangent point, and the lights at both tangent points are counted. Set out each light from the first TP with the deflection angle and chord, or with X along the tangent and Y square to it. The centreline table gives the maximum spacing by radius (radius up to 400 m: 7.5 m, up to 900 m: 15 m, larger: 30 m; below RVR 350 m: 7.5 m under 150 m radius, otherwise 15 m). Edge lights on curves have their own spacing in your standard: choose “My own maximum spacing” for them.</p>
+      </article>
     </section>
 
     <!-- J · Maintenance -->
@@ -783,6 +826,11 @@
           </table>
         </div>
       </article>
+      <article class="lesson">
+        <h3>Troubleshooting flowcharts</h3>
+        <p class="lede-small">Pick the part of the system and the symptom. Work down the checks: an answer that leaves the line sends you to a fix or to another chart, the other answer takes you to the next check. Lock out before any work on a circuit.</p>
+        <div id="flows"></div>
+      </article>
     </section>
 
     <p class="foot">AGL Field Course is training material. Figures are typical values for learning purposes. Design, install and maintain airfield lighting to the current edition of the standards your aviation authority applies and to the equipment manufacturers' instructions.</p>
@@ -790,20 +838,21 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="js/data.js?v=20261103"></script>
-<script src="js/detail-data.js?v=20261103"></script>
-<script src="js/vault-data.js?v=20261103"></script>
-<script src="js/he.js?v=20261103"></script>
-<script src="js/he-static.js?v=20261103"></script>
-<script src="js/i18n.js?v=20261103"></script>
-<script src="js/airfield.js?v=20261103"></script>
-<script src="js/circuit.js?v=20261103"></script>
-<script src="js/calc.js?v=20261103"></script>
-<script src="js/learn.js?v=20261103"></script>
-<script src="js/detail3d.js?v=20261103"></script>
-<script src="js/vault.js?v=20261103"></script>
-<script src="js/vault3d.js?v=20261103"></script>
-<script src="js/faultgame.js?v=20261103"></script>
-<script src="js/app.js?v=20261103"></script>
+<script src="js/data.js?v=20261104"></script>
+<script src="js/detail-data.js?v=20261104"></script>
+<script src="js/vault-data.js?v=20261104"></script>
+<script src="js/he.js?v=20261104"></script>
+<script src="js/he-static.js?v=20261104"></script>
+<script src="js/i18n.js?v=20261104"></script>
+<script src="js/airfield.js?v=20261104"></script>
+<script src="js/circuit.js?v=20261104"></script>
+<script src="js/calc.js?v=20261104"></script>
+<script src="js/learn.js?v=20261104"></script>
+<script src="js/detail3d.js?v=20261104"></script>
+<script src="js/vault.js?v=20261104"></script>
+<script src="js/vault3d.js?v=20261104"></script>
+<script src="js/faultgame.js?v=20261104"></script>
+<script src="js/flows.js?v=20261104"></script>
+<script src="js/app.js?v=20261104"></script>
 </body>
 </html>

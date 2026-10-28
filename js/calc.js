@@ -1,4 +1,4 @@
-/* Module F: CCR sizing, insulation resistance trend, loop resistance check. */
+/* Module H: CCR sizing, insulation resistance trend, loop resistance check, lights on a curve. */
 (function () {
   const XFMR = [
     ["10/15 W", 15, 0.70], ["20/25 W", 25, 0.75], ["30/45 W", 45, 0.80], ["65 W", 65, 0.85],
@@ -205,6 +205,125 @@
     txt.textContent = msg;
   }
 
+  /* ---------- Lights on a curve ---------- */
+  // Maximum centreline spacing on a curve by radius (ICAO Annex 14 / FAA AC 150/5340-30 typical)
+  function curveMax(rule, r) {
+    if (rule === "own") return num("cv-s");
+    if (rule === "low") return r < 150 ? 7.5 : 15;
+    return r <= 400 ? 7.5 : r < 900 ? 15 : 30;
+  }
+  let cvLines = [];
+
+  function computeCurve() {
+    const R = num("cv-r"), A = Math.min(180, num("cv-a")), W = num("cv-w"), on = document.getElementById("cv-on").value;
+    const rule = document.getElementById("cv-rule").value;
+    document.getElementById("cv-s").disabled = rule !== "own";
+    const theta = A * Math.PI / 180;
+    const defs = [];
+    if (on !== "edges") defs.push({ key: "cl", name: AGL.t("Centreline"), r: R });
+    if (on !== "cl") {
+      defs.push({ key: "in", name: AGL.t("Inner edge"), r: R - W / 2 });
+      defs.push({ key: "out", name: AGL.t("Outer edge"), r: R + W / 2 });
+    }
+    const notes = [];
+    cvLines = defs.filter(d => {
+      if (d.r > 0.5) return true;
+      notes.push(AGL.t("The inner edge has no radius left: the taxiway is wider than the curve allows."));
+      return false;
+    }).map(d => {
+      const max = curveMax(rule, d.r);
+      const L = d.r * theta;
+      const n = Math.max(1, Math.ceil(L / max - 1e-9));
+      const sp = L / n;
+      return Object.assign(d, { max, L, n, sp, chord: 2 * d.r * Math.sin(sp / (2 * d.r)), lights: n + 1 });
+    });
+    const total = document.getElementById("cv-total"), note = document.getElementById("cv-total-note");
+    const body = document.getElementById("cv-results");
+    if (!R || !A || !cvLines.length || cvLines.some(l => !(l.max > 0))) {
+      total.textContent = "–";
+      note.textContent = AGL.t("Enter a radius, an angle and a maximum spacing.");
+      body.innerHTML = "";
+      document.getElementById("cv-draw").innerHTML = "";
+      document.getElementById("cv-rows").innerHTML = "";
+      return;
+    }
+    const sum = cvLines.reduce((t, l) => t + l.lights, 0);
+    total.innerHTML = `<bdi dir="ltr">${sum}</bdi>`;
+    note.textContent = AGL.t("including the lights at the tangent points; {k} of them lie between the tangent points", { k: cvLines.reduce((t, l) => t + l.n - 1, 0) }) +
+      (notes.length ? ". " + notes.join(" ") : "");
+    const row = (k, v) => `<tr><td>${esc(k)}</td><td class="num"><bdi dir="ltr">${v}</bdi></td></tr>`;
+    body.innerHTML = cvLines.map(l => `<tr class="cv-head"><td colspan="2">${esc(l.name)}</td></tr>` +
+      row(AGL.t("Radius"), fmt(l.r, 1) + " m") + row(AGL.t("Arc length"), fmt(l.L, 1) + " m") +
+      row(AGL.t("Maximum spacing"), fmt(l.max, 1) + " m") + row(AGL.t("Spacing along the arc"), fmt(l.sp, 2) + " m") +
+      row(AGL.t("Chord between lights"), fmt(l.chord, 2) + " m") + row(AGL.t("Lights"), l.lights)).join("");
+
+    // Line picker for the setting-out table
+    const sel = document.getElementById("cv-line"), keep = sel.value;
+    sel.innerHTML = cvLines.map(l => `<option value="${l.key}">${esc(l.name)}</option>`).join("");
+    sel.value = cvLines.some(l => l.key === keep) ? keep : cvLines[0].key;
+    renderCurveTable();
+    drawCurve(theta);
+  }
+
+  function renderCurveTable() {
+    const l = cvLines.find(x => x.key === document.getElementById("cv-line").value) || cvLines[0];
+    if (!l) return;
+    let rows = "";
+    for (let i = 0; i <= l.n; i++) {
+      const d = i * l.sp / l.r;
+      const label = i === 0 ? AGL.t("TP 1") : i === l.n ? AGL.t("TP 2") : String(i);
+      rows += `<tr><td>${esc(label)}</td><td class="num">${fmt(i * l.sp, 2)}</td><td class="num">${fmt(2 * l.r * Math.sin(d / 2), 2)}</td>
+        <td class="num">${fmt(d / 2 * 180 / Math.PI, 3)}</td><td class="num">${fmt(l.r * Math.sin(d), 2)}</td><td class="num">${fmt(l.r * (1 - Math.cos(d)), 2)}</td></tr>`;
+    }
+    document.getElementById("cv-rows").innerHTML = rows;
+  }
+
+  // Plan of the curve: the arcs with every light, both tangents and the radius
+  function drawCurve(theta) {
+    const W = 640, H = 400, pad = 46;
+    const Rmax = Math.max(...cvLines.map(l => l.r));
+    // The curve starts at TP1 heading +x and turns left about the centre (0, R)
+    const Rc = num("cv-r");
+    const pt = (r, a) => [r * Math.sin(a), Rc - r * Math.cos(a)];
+    const tan = Math.max(Rmax * 0.35, 10);
+    const pts = [[-tan, Rc - Rmax], [0, Rc - Rmax]];
+    cvLines.forEach(l => { for (let k = 0; k <= 24; k++) pts.push(pt(l.r, theta * k / 24)); });
+    const endA = theta;
+    pts.push([Rmax * Math.sin(endA) + tan * Math.cos(endA), Rc - Rmax * Math.cos(endA) + tan * Math.sin(endA)], [0, Rc]);
+    const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const k = Math.min((W - 2 * pad) / (x1 - x0 || 1), (H - 2 * pad) / (y1 - y0 || 1));
+    // Screen y points up the page, so the curve bends upwards
+    const X = x => pad + (x - x0) * k + ((W - 2 * pad) - (x1 - x0) * k) / 2;
+    const Y = y => H - pad - (y - y0) * k - ((H - 2 * pad) - (y1 - y0) * k) / 2;
+    let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(AGL.t("Plan of the curve with every light"))}">`;
+    const cx = X(0), cy = Y(Rc);
+    s += `<circle class="cv-c" cx="${cx}" cy="${cy}" r="4"/><text class="cv-lab" x="${cx + 8}" y="${cy - 8}">${esc(AGL.t("Centre"))}</text>`;
+    cvLines.forEach(l => {
+      const [ax, ay] = pt(l.r, 0), [bx, by] = pt(l.r, theta);
+      const tx = Math.cos(theta), ty = Math.sin(theta);
+      s += `<path class="cv-tan" d="M${X(ax - tan)},${Y(ay)} L${X(ax)},${Y(ay)} M${X(bx)},${Y(by)} L${X(bx + tan * tx)},${Y(by + tan * ty)}"/>`;
+      let d = "";
+      for (let i = 0; i <= 48; i++) { const [x, y] = pt(l.r, theta * i / 48); d += (i ? "L" : "M") + X(x).toFixed(1) + "," + Y(y).toFixed(1); }
+      s += `<path class="cv-arc ${l.key}" d="${d}"/>`;
+      for (let i = 0; i <= l.n; i++) {
+        const [x, y] = pt(l.r, i * l.sp / l.r);
+        s += `<circle class="cv-light ${l.key}${i === 0 || i === l.n ? " tp" : ""}" cx="${X(x).toFixed(1)}" cy="${Y(y).toFixed(1)}" r="${l.key === "cl" ? 5 : 4.5}"/>`;
+      }
+    });
+    const main = cvLines.find(l => l.key === "cl") || cvLines[cvLines.length - 1];
+    const [mx, my] = pt(main.r, theta / 2);
+    s += `<path class="cv-rad" d="M${cx},${cy} L${X(mx)},${Y(my)}"/>
+      <text class="cv-lab" x="${(cx + X(mx)) / 2 + 6}" y="${(cy + Y(my)) / 2}">R ${fmt(main.r, 1)} m</text>`;
+    const [p1x, p1y] = pt(main.r, 0), [p2x, p2y] = pt(main.r, theta);
+    s += `<text class="cv-lab tp" x="${X(p1x)}" y="${Y(p1y) + 22}" text-anchor="middle">${esc(AGL.t("TP 1"))}</text>
+      <text class="cv-lab tp" x="${X(p2x) + 14 * Math.cos(theta)}" y="${Y(p2y) - 14}" text-anchor="middle">${esc(AGL.t("TP 2"))}</text>`;
+    s += "</svg>";
+    const host = document.getElementById("cv-draw");
+    host.innerHTML = s;
+    AGL.bidiSvg(host);
+  }
+
   AGL.initCalc = function () {
     EXAMPLE_ROWS.forEach(addRow);
     document.getElementById("calc-add").addEventListener("click", () => {
@@ -246,6 +365,10 @@
     ["lr-len", "lr-cond", "lr-n", "lr-w", "lr-t", "lr-m"].forEach(id => document.getElementById(id).addEventListener("input", computeLoop));
     computeLoop();
 
-    AGL.onLang(() => { relabelRows(); computeCCR(); renderIR(); computeLoop(); });
+    ["cv-r", "cv-a", "cv-on", "cv-w", "cv-rule", "cv-s"].forEach(id => document.getElementById(id).addEventListener("input", computeCurve));
+    document.getElementById("cv-line").addEventListener("change", renderCurveTable);
+    computeCurve();
+
+    AGL.onLang(() => { relabelRows(); computeCCR(); renderIR(); computeLoop(); computeCurve(); });
   };
 })();
