@@ -1254,7 +1254,7 @@ label.field.inline select { min-width: 180px; }
 .cd-sig { stroke: var(--muted); stroke-width: 2; stroke-dasharray: 6 4; fill: none; }
 .cd-arrhead { fill: var(--muted); }
 .cd-earth { stroke: var(--muted); stroke-width: 2; }
-.cd-row { font-family: var(--f-display); font-weight: 700; font-size: 14px; letter-spacing: 0.06em; text-transform: uppercase; fill: var(--muted); }
+.cd-row { font-family: var(--f-display); font-weight: 700; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; fill: var(--muted); }
 .cd-lab { font-family: var(--f-body); font-size: 12px; font-weight: 600; fill: var(--muted); }
 .cd-info h4 { margin: 6px 0 4px; font-size: var(--step-1); }
 .cd-info p { margin: 0 0 8px; }
@@ -1265,3 +1265,34 @@ label.field.inline select { min-width: 180px; }
 .cd-wave { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linejoin: round; }
 .cd-note { margin-top: var(--sp-3); }
 .cd input[type="range"] { width: 100%; accent-color: var(--accent-fill); }
+
+/* CCR schematic: standard symbols, black on the sheet, the selected component highlighted */
+.cd-diagram svg { font-family: var(--f-body); }
+.cd-sheet { fill: var(--surface); stroke: var(--rule); }
+.cd-div { stroke: var(--rule); stroke-dasharray: 2 4; }
+.cd-diagram .wire { fill: none; stroke: var(--ink); stroke-width: 2; }
+.cd-diagram .sym { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; }
+.cd-diagram .sym.thick { stroke-width: 4; }
+.cd-diagram .sym.fillw { fill: var(--surface); }
+.cd-diagram .sym.fillk { fill: var(--ink); }
+.cd-diagram .term { fill: var(--surface); stroke: var(--ink); stroke-width: 2; }
+.cd-diagram .dot { fill: var(--ink); }
+.cd-diagram .mech { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.cd-diagram .mech.dash { stroke-dasharray: 6 4; }
+.cd-diagram .sig { fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-dasharray: 7 4; }
+.cd-diagram .cd-arrhead { fill: var(--accent); }
+.cd-diagram .pin { font-size: 15px; font-weight: 700; fill: var(--ink); }
+.cd-diagram .pin.small { font-size: 13px; }
+.cd-diagram .slab { font-size: 12px; font-weight: 600; fill: var(--accent); }
+.cd-diagram .des { font-family: var(--f-mono); font-size: 13px; font-weight: 600; fill: var(--ink); }
+.cd-diagram .cap { font-size: 12px; fill: var(--muted); }
+.cd-diagram .cap.in { font-size: 13px; font-weight: 600; fill: var(--ink); }
+.cd-diagram .box { fill: var(--surface); stroke: var(--ink); stroke-width: 2; }
+.cd-comp { cursor: pointer; }
+.cd-comp:focus { outline: none; }
+.cd-comp .hl { fill: var(--accent-fill); fill-opacity: 0; stroke: none; }
+.cd-comp:hover .hl, .cd-comp:focus-visible .hl { fill-opacity: 0.18; }
+.cd-comp.on .hl { fill-opacity: 0.32; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.cd-comp.on .sym, .cd-comp.on .box { stroke: var(--accent); }
+.cd-comp.on .sym.fillk { fill: var(--accent); }
+.cd-comp.on .des { fill: var(--accent); }

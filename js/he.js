@@ -252,6 +252,14 @@ AGL.HE.STR = {
   "Centre": "מרכז",
 
   // How a CCR works
+  "Power circuit": "מעגל הספק",
+  "Control circuit": "מעגל פיקוד",
+  "Thyristors": "תיריסטורים",
+  "Inverter": "ממיר",
+  "firing pulses": "פולסי הצתה",
+  "PWM": "PWM",
+  "trip: opens K1": "הפלה: פותח את K1",
+  "to the ALCMS": "אל ה־ALCMS",
   "How a constant current regulator works": "כך עובד ווסת זרם קבוע",
   "Power path": "מסלול ההספק",
   "Control path": "מסלול הבקרה",

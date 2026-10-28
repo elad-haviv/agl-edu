@@ -90,50 +90,126 @@
     return out;
   }
 
+  /* ---------- The schematic ----------
+     Power circuit as a two-wire schematic with IEC symbols; control circuit as function blocks.
+     Each component is a group with an invisible hit box; the selected one is highlighted. */
+  const yL = 90, yN = 170;
+  const coilV = (x, y1, y2, dir) => {           // vertical winding, bumps to the right (dir 1) or left (-1)
+    const n = 4, h = (y2 - y1) / n;
+    let d = `M${x},${y1}`;
+    for (let i = 0; i < n; i++) d += ` a${h / 2},${h / 2} 0 0 ${dir > 0 ? 1 : 0} 0,${h}`;
+    return d;
+  };
+  const coilH = (x1, x2, y, dir) => {           // horizontal winding, bumps up (dir -1) or down (1)
+    const n = 3, w = (x2 - x1) / n;
+    let d = `M${x1},${y}`;
+    for (let i = 0; i < n; i++) d += ` a${w / 2},${w / 2} 0 0 ${dir < 0 ? 1 : 0} ${w},0`;
+    return d;
+  };
+  const earth = (x, y) => `M${x},${y} v6 M${x - 9},${y + 6} h18 M${x - 6},${y + 10} h12 M${x - 3},${y + 14} h6`;
+  // Normally open contact on a horizontal wire: x1 fixed end, x2 moving end; mark "x" breaker or "c" contactor
+  function contact(x1, x2, y, mark) {
+    let d = `M${x1 - 14},${y} H${x1} M${x2},${y} H${x2 + 14} M${x2},${y} L${x1 + 2},${y - 14}`;
+    if (mark === "x") d += ` M${x1 - 4},${y - 4} l8,8 M${x1 + 4},${y - 4} l-8,8`;
+    return `<path class="sym" d="${d}"/>` + (mark === "c" ? `<path class="sym" d="M${x1},${y} a4,4 0 0 1 -8,0" />` : "");
+  }
+
+  // Short captions for the schematic; the full names appear in the explanation panel
+  const SHORT = {
+    supply: L("Mains supply", "הזנת רשת"), contactor: L("Breaker and contactor", "מפסק ומגען"), otx: L("Output transformer", "שנאי יציאה"),
+    ct: L("Current sensor", "חיישן זרם"), out: L("Surge arresters", "מגיני ברק"), cutout: L("Series cutout", "מנתק טורי"),
+    loop: L("Field loop", "לולאת השדה"), ctlpower: L("Control supply and fuse", "הזנת פיקוד ונתיך")
+  };
+  function comp(id, box, body, des, nameY, nameX, wrapAt) {
+    const b = byId(id), on = st.sel === id;
+    let name = tx(SHORT[id] || b.name);
+    if (id === "power") name = st.tech === "scr" ? AGL.t("Thyristors") : AGL.t("Inverter");
+    const [x, y, w, h] = box;
+    const lines = wrapLines(name, wrapAt || Math.max(14, Math.floor(w / 6.4)));
+    const nx = nameX !== undefined ? nameX : x + w / 2;
+    return `<g class="cd-comp${on ? " on" : ""}" data-block="${id}" tabindex="0" role="button" aria-pressed="${on}" aria-label="${esc(des + " " + tx(b.name))}">
+      <rect class="hl" x="${x}" y="${y}" width="${w}" height="${h}" rx="6"/>${body}
+      ${des ? `<text class="des" x="${nx}" y="${nameY}" text-anchor="middle">${esc(des)}</text>` : ""}
+      ${lines.slice(0, 2).map((l, i) => `<text class="cap" x="${nx}" y="${nameY + (des ? 14 : 0) + i * 13}" text-anchor="middle">${esc(l)}</text>`).join("")}</g>`;
+  }
+  function block(id, x, y, w, h, des) {
+    const b = byId(id), on = st.sel === id;
+    const lines = wrapLines(tx(b.name), Math.floor(w / 7.2));
+    return `<g class="cd-comp blk${on ? " on" : ""}" data-block="${id}" tabindex="0" role="button" aria-pressed="${on}" aria-label="${esc(des + " " + tx(b.name))}">
+      <rect class="hl" x="${x - 4}" y="${y - 4}" width="${w + 8}" height="${h + 8}" rx="6"/>
+      <rect class="box" x="${x}" y="${y}" width="${w}" height="${h}"/>
+      <text class="des" x="${x + 6}" y="${y + 15}">${des}</text>
+      ${lines.map((l, i) => `<text class="cap in" x="${x + w / 2}" y="${y + h / 2 + 8 + (i - (lines.length - 1) / 2) * 14}" text-anchor="middle">${esc(l)}</text>`).join("")}</g>`;
+  }
+
   function diagram() {
-    const W = 1000, Hh = 360;
+    const W = 1000, Hh = 420;
     let s = `<svg viewBox="0 0 ${W} ${Hh}" role="group" aria-label="${esc(AGL.t("How a constant current regulator works"))}">
-      <defs><marker id="ccr-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" class="cd-arrhead"/></marker></defs>
-      <text class="cd-row" x="14" y="56">${esc(AGL.t("Power path"))}</text>
-      <text class="cd-row" x="14" y="236">${esc(AGL.t("Control path"))}</text>`;
-    // Power path arrows between neighbours
-    const pw = BLOCKS.filter(b => b.row === 0);
-    for (let i = 0; i + 1 < pw.length; i++) {
-      const a = pw[i], b = pw[i + 1], y = rowY[0] + H / 2;
-      s += `<path class="cd-power" d="M${a.x + a.w},${y} H${b.x - 2}" marker-end="url(#ccr-arr)"/>`;
+      <defs><marker id="ccr-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" class="cd-arrhead"/></marker></defs>
+      <rect class="cd-sheet" x="4" y="4" width="${W - 8}" height="${Hh - 8}"/>
+      <text class="cd-row" x="${W - 14}" y="${Hh - 14}" text-anchor="end">${esc(AGL.t("Control circuit"))}</text>
+      <text class="cd-row" x="${W - 14}" y="240" text-anchor="end">${esc(AGL.t("Power circuit"))}</text>
+      <path class="cd-div" d="M8,252 H${W - 8}"/>`;
+    // Wires of the power circuit (drawn first, symbols on top)
+    s += `<path class="wire" d="M40,${yL} H56 M98,${yL} H126 M168,${yL} H212 M308,${yL} H350 V100 M40,${yN} H56 M98,${yN} H126 M168,${yN} H350 V160
+      M378,100 V${yL} H588 M378,160 V${yN} H588 M632,${yL} H700 M752,${yL} H838 M890,${yL} H975 V${yN} H632"/>`;
+    // Supply terminals
+    s += comp("supply", [12, 8, 56, 182], `<circle class="term" cx="40" cy="${yL}" r="4"/><circle class="term" cx="40" cy="${yN}" r="4"/>
+      <text class="pin" x="22" y="${yL + 4}">L</text><text class="pin" x="22" y="${yN + 4}">N</text>`, "X1", 22, 34, 7);
+    // Q1 breaker and K1 contactor (two poles each, linked), with K1's coil in the control circuit
+    s += comp("contactor", [52, 8, 136, 250], contact(70, 84, yL, "x") + contact(70, 84, yN, "x") + `<path class="mech" d="M78,${yL - 9} V${yN - 9}"/>` +
+      contact(140, 154, yL, "c") + contact(140, 154, yN, "c") + `<path class="mech" d="M148,${yL - 9} V${yN - 9} M148,${yN - 9} V232"/>
+      <rect class="sym fillw" x="138" y="232" width="20" height="16"/><text class="pin" x="164" y="244">K1</text>`, "Q1 · K1", 22, 118, 12);
+    // Power stage: anti-parallel thyristors, or an inverter
+    if (st.tech === "scr") {
+      s += comp("power", [206, 8, 108, 184], `<path class="wire" d="M212,${yL} H224 V${yL - 22} H244 M276,${yL - 22} H296 V${yL} H308 M224,${yL} V${yL + 22} H244 M276,${yL + 22} H296 V${yL}"/>
+        <path class="sym fillk" d="M244,${yL - 32} L264,${yL - 22} L244,${yL - 12} Z"/><path class="sym" d="M264,${yL - 32} V${yL - 12} M264,${yL - 22} H276 M258,${yL - 15} l10,10"/>
+        <path class="sym fillk" d="M276,${yL + 12} L256,${yL + 22} L276,${yL + 32} Z"/><path class="sym" d="M256,${yL + 12} V${yL + 32} M244,${yL + 22} H256 M262,${yL + 29} l-10,10"/>`, "V1 · V2", 22);
+    } else {
+      s += comp("power", [206, 8, 108, 184], `<path class="wire" d="M212,${yL} H230 M290,${yL} H308"/>
+        <rect class="sym fillw" x="230" y="${yL - 26}" width="60" height="52"/><path class="sym" d="M230,${yL + 26} L290,${yL - 26}"/>
+        <text class="pin" x="236" y="${yL - 10}">~</text><text class="pin" x="266" y="${yL + 20}">~</text><text class="pin small" x="246" y="${yL + 6}">=</text>`, "U1", 22);
     }
-    // Control links
-    // Signal from one block to another, labelled next to the arrow head
-    const link = (from, to, label, anchor) => {
-      const [x1] = mid(byId(from)), [x2] = mid(byId(to));
-      const yA = byId(from).row === 0 ? rowY[0] + H : rowY[1], yB = byId(to).row === 0 ? rowY[0] + H : rowY[1];
-      s += `<path class="cd-sig" d="M${x1},${yA} C${x1},${(yA + yB) / 2} ${x2},${(yA + yB) / 2} ${x2},${yB}" marker-end="url(#ccr-arr)"/>`;
-      const ty = yB < yA ? yB + 16 : yB - 8;
-      if (label) s += `<text class="cd-lab" x="${x2 + (anchor === "end" ? -8 : 8)}" y="${ty}" text-anchor="${anchor}">${esc(label)}</text>`;
-    };
-    link("ct", "reg", AGL.t("measured current"), "start");
-    link("reg", "power", st.tech === "scr" ? AGL.t("firing angle") : AGL.t("PWM duty"), "start");
-    link("prot", "contactor", AGL.t("trip"), "end");
-    link("irms", "out", "", "start");
-    // Same-row control links
-    const yC = rowY[1] + H / 2;
-    s += `<path class="cd-sig" d="M${byId("cmd").x + byId("cmd").w},${yC} H${byId("reg").x - 2}" marker-end="url(#ccr-arr)"/>
-      <path class="cd-sig" d="M${byId("reg").x + byId("reg").w},${yC} H${byId("prot").x - 2}" marker-end="url(#ccr-arr)"/>
-      <path class="cd-sig" d="M${byId("ctlpower").x + byId("ctlpower").w},${yC + 22} H${byId("cmd").x - 2}" marker-end="url(#ccr-arr)"/>
-      <path class="cd-sig" d="M${byId("irms").x + byId("irms").w},${yC} H${byId("mon").x - 2}" marker-end="url(#ccr-arr)"/>`;
-    BLOCKS.forEach(b => {
-      const y = rowY[b.row], on = st.sel === b.id;
-      let name = tx(b.name);
-      if (b.id === "power") name += " · " + (st.tech === "scr" ? AGL.t("thyristors") : "IGBT");
-      const lines = wrapLines(name, Math.floor(b.w / 8.2));
-      s += `<g class="cd-block${on ? " on" : ""} ${b.row ? "ctl" : "pwr"}" data-block="${b.id}" tabindex="0" role="button" aria-pressed="${on}" aria-label="${esc(name)}">
-        <rect x="${b.x}" y="${y}" width="${b.w}" height="${H}" rx="8"/>
-        ${lines.map((l, i) => `<text x="${b.x + b.w / 2}" y="${y + H / 2 + (i - (lines.length - 1) / 2) * 16 + 5}" text-anchor="middle">${esc(l)}</text>`).join("")}
-      </g>`;
-    });
-    // Earth for the insulation monitor
-    const [ix] = mid(byId("irms"));
-    s += `<path class="cd-sig" d="M${ix},${rowY[1] + H} V${rowY[1] + H + 14}"/><path class="cd-earth" d="M${ix - 10},${rowY[1] + H + 14} H${ix + 10} M${ix - 6},${rowY[1] + H + 19} H${ix + 6} M${ix - 2},${rowY[1] + H + 24} H${ix + 2}"/>`;
+    // T1 output transformer
+    s += comp("otx", [334, 8, 60, 186], `<path class="sym" d="${coilV(350, 100, 160, 1)}"/><path class="sym" d="M362,98 V162 M366,98 V162"/>
+      <path class="sym" d="${coilV(378, 100, 160, -1)}"/>`, "T1", 22, 364);
+    // TA1 current transformer on the output
+    s += comp("ct", [414, 8, 56, 108], `<circle class="sym fillw" cx="442" cy="${yL}" r="10"/><circle class="sym fillw" cx="442" cy="${yL}" r="10" style="fill:none"/>
+      <path class="sig" d="M442,${yL + 10} V230 H428 V292"/>`, "TA1", 22, 442, 8);
+    // F1, F2 surge arresters to earth
+    s += comp("out", [476, 8, 78, 224], `<path class="wire" d="M496,${yL} V104 M530,${yN} V184"/><rect class="sym fillw" x="490" y="104" width="12" height="22"/><path class="sym" d="M496,108 v14 m-4,-5 l4,5 l4,-5"/>
+      <path class="sym" d="M496,126 V132 ${earth(496, 132)}"/>
+      <rect class="sym fillw" x="524" y="184" width="12" height="22"/><path class="sym" d="M530,188 v14 m-4,-5 l4,5 l4,-5"/><path class="sym" d="M530,206 V212 ${earth(530, 212)}"/>`, "F1 · F2", 22, 520, 9);
+    // S1 series cutout: plug bridging each pole, shorting link on the CCR side when withdrawn
+    s += comp("cutout", [562, 8, 100, 186], `<path class="mech dash" d="M574,70 H650 V190 H574 Z"/>
+      <circle class="term" cx="588" cy="${yL}" r="4"/><circle class="term" cx="632" cy="${yL}" r="4"/><path class="sym thick" d="M592,${yL} H628"/>
+      <circle class="term" cx="588" cy="${yN}" r="4"/><circle class="term" cx="632" cy="${yN}" r="4"/><path class="sym thick" d="M592,${yN} H628"/>
+      <path class="mech" d="M582,${yL + 4} V${yN - 4}"/>`, "S1", 22, 612);
+    // Field loop: isolating transformers in series, each feeding its lamp
+    const lamp = (x) => `<path class="sym" d="${coilH(x - 26, x + 26, yL, -1)}"/><path class="sym" d="M${x - 26},${yL + 6} H${x + 26} M${x - 26},${yL + 10} H${x + 26}"/>
+      <path class="sym" d="${coilH(x - 26, x + 26, yL + 16, 1)}"/><path class="wire" d="M${x - 26},${yL + 16} V${yL + 46} H${x - 9} M${x + 26},${yL + 16} V${yL + 46} H${x + 9}"/>
+      <circle class="sym fillw" cx="${x}" cy="${yL + 46}" r="9"/><path class="sym" d="M${x - 6},${yL + 40} l12,12 M${x + 6},${yL + 40} l-12,12"/>`;
+    s += comp("loop", [670, 8, 320, 182], lamp(726) + lamp(864) + `<text class="pin" x="795" y="${yL + 4}">· · ·</text>`, "", 22, 820);
+    // Control circuit: control supply, then the function blocks
+    s += comp("ctlpower", [12, 192, 122, 178], `<path class="wire" d="M48,${yL} V196 M48,218 V238"/><circle class="dot" cx="48" cy="${yL}" r="3"/>
+      <rect class="sym fillw" x="42" y="196" width="12" height="22"/><path class="sym" d="M48,196 V218"/>
+      <circle class="sym" cx="48" cy="246" r="8" style="fill:none"/><circle class="sym" cx="48" cy="258" r="8" style="fill:none"/>
+      <path class="sig" d="M48,266 V300 H174" marker-end="url(#ccr-arr)"/>`, "F3 · T2", 328, 66);
+    s += block("cmd", 176, 282, 120, 52, "A2");
+    s += block("reg", 324, 282, 140, 52, "A1");
+    s += block("prot", 494, 282, 140, 52, "A3");
+    s += block("irms", 676, 282, 128, 52, "A4");
+    s += block("mon", 836, 282, 148, 52, "A5");
+    // Signals
+    s += `<path class="sig" d="M296,308 H322" marker-end="url(#ccr-arr)"/>
+      <path class="sig" d="M342,282 V244 H${st.tech === "scr" ? 262 : 260} V${st.tech === "scr" ? yL + 36 : yL + 28}" marker-end="url(#ccr-arr)"/>
+      <text class="slab" x="${st.tech === "scr" ? 270 : 268}" y="238">${esc(st.tech === "scr" ? AGL.t("firing pulses") : AGL.t("PWM"))}</text>
+      <path class="sig" d="M428,230 H560 V280" marker-end="url(#ccr-arr)"/><text class="slab" x="452" y="246">${esc(AGL.t("measured current"))}</text>
+      <path class="sig" d="M560,334 V352 H148 V250" marker-end="url(#ccr-arr)"/><text class="slab" x="330" y="366">${esc(AGL.t("trip: opens K1"))}</text>
+      <path class="wire" d="M700,${yN} V280"/><circle class="dot" cx="700" cy="${yN}" r="3"/><path class="sym" d="M760,334 V344 ${earth(760, 344)}"/>
+      <path class="sig" d="M804,308 H834" marker-end="url(#ccr-arr)"/>
+      <path class="sig" d="M634,300 H660 V262 H900 V280" marker-end="url(#ccr-arr)"/>
+      <path class="sig" d="M984,308 H994"/><text class="slab" x="980" y="352" text-anchor="end">${esc(AGL.t("to the ALCMS"))}</text>`;
     return s + "</svg>";
   }
 
