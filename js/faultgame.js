@@ -593,7 +593,7 @@
 
   function resultSvg() {
     let s = `<text class="fg-stars" x="30" y="352">${"★".repeat(st.stars)}${"☆".repeat(3 - st.stars)}</text>
-      <text class="ins-title" x="30" y="390">${esc(T("Fault cleared in {h} h {m} min", { h: Math.floor(st.minutes / 60), m: Math.round(st.minutes % 60) }))}</text>`;
+      <text class="ins-title" x="30" y="390">${esc(T(st.faults.length > 1 ? "All faults cleared in {h} h {m} min" : "Fault cleared in {h} h {m} min", { h: Math.floor(st.minutes / 60), m: Math.round(st.minutes % 60) }))}</text>`;
     let y = 418;
     const add = (text, cls, max, lh) => { const w = wrap(text, 30, y, max || 62, cls, lh || 22); s += w.svg; y += w.h + 6; };
     if (st.faults.length === 1) add(T("The short was {where}.", { where: faultName(st.faults[0]) }), "lab");

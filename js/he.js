@@ -227,6 +227,7 @@ AGL.HE.STR = {
   "3D tour": "סיור בתלת־ממד",
 
   // Fault-finding game
+  "All faults cleared in {h} h {m} min": "כל התקלות תוקנו תוך {h} ש׳ ו־{m} דק׳",
   "Work order: this old runway edge circuit has an earth fault alarm and has not been tested for years. Expect more than one weak spot.": "הוראת עבודה: מעגל שולי המסלול הישן הזה מתריע על קצר לאדמה ולא נבדק שנים. צפו ליותר מנקודה חלשה אחת.",
   "Whole loop proved healthy from the vault. All {n} faults cleared.": "כל הלולאה נמצאה תקינה ממרכז החשמל. כל {n} התקלות תוקנו.",
   "You cut out a connector with a hairline crack through its boot and fitted a new one.": "חתכתם מחבר עם סדק שיערה בשרוול והרכבתם מחבר חדש.",
