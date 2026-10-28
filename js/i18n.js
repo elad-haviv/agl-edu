@@ -21,8 +21,8 @@
   function stored() {
     try { return localStorage.getItem(KEY); } catch (e) { return null; }
   }
-  AGL.lang = stored() || ((navigator.language || "").toLowerCase().startsWith("he") ? "he" : "en");
-  if (AGL.lang !== "he") AGL.lang = "en";
+  // Hebrew unless the reader has chosen English
+  AGL.lang = stored() === "en" ? "en" : "he";
 
   /* UI string: the English text is the key and the fallback. {name} placeholders are filled from vars. */
   AGL.t = function (en, vars) {
