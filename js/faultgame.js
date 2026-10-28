@@ -1,5 +1,6 @@
 /* Module J: fault-finding games on a runway edge circuit. "Find the short" (J3) hides earth faults;
-   "Find the open circuit" (J4) hides breaks in the loop. Everything happens on one drawing: the circuit map on top, a close-up of where you stand
+   "Find the open circuit" (J4) hides breaks in the loop; the lighting fault simulator (J5) runs the
+   circuit live, with lamps, fittings, secondary connectors, the CCR itself and interleaved circuits. Everything happens on one drawing: the circuit map on top, a close-up of where you stand
    (the vault or a light base) and an insulation tester whose leads you clip on yourself.
    Loop positions: the vault OUT terminal is 0, base j sits at j, the vault RET terminal is N+1.
    Unplugging the primary connector on side s of base j (s = -1 towards base j-1, +1 towards j+1)
@@ -10,7 +11,12 @@
 (function () {
   const LEVELS = { easy: 12, normal: 24, hard: 40 };
   const VOLTS = [0, 250, 500, 1000, 2500, 5000];   // 0 is the low-ohm continuity range
-  const COST = { isolate: 10, cutout: 2, lid: 10, lidClose: 5, unplug: 2, replug: 3, clip: 1, conn: 30, txr: 45, span: 120 };
+  const COST = { isolate: 10, cutout: 2, lid: 10, lidClose: 5, unplug: 2, replug: 3, clip: 1, conn: 30, txr: 45, span: 120,
+    lamp: 10, fitting: 20, sec: 15, fuse: 5, cal: 30, board: 60, energize: 3 };
+  const STEPS = [2.8, 3.4, 4.1, 5.2, 6.6];   // CCR output current per brightness step, A
+  // Keys that belong to one circuit; on the simulator's interleaved pair each circuit has its own
+  const CK = new Set(["N", "faults", "wet", "wear", "re", "jumpers", "k", "isolated", "cutout", "lids", "unplugged", "measured",
+    "replaced", "secun", "step", "trip", "clamp"]);
   const SPEED = 4;      // test seconds per real second
   const LOW = 50;       // MΩ: a settled reading below this marks the section faulty on the map
   const MAXR = 1e5;     // MΩ: the tester reads up to 100 GΩ
@@ -28,15 +34,21 @@
   const vName = v => (v === 0 ? "Ω" : v >= 1000 ? v / 1000 + "k" : String(v));
 
   function Game(host, mode) {
-  const OPEN = mode === "open";
-  const st = { level: "normal", diff: "medium", volt: OPEN ? 0 : 1000 };
+  const OPEN = mode === "open", SIM = mode === "sim", JUMP = OPEN || SIM;
+  const base = { level: "normal", diff: "medium", scen: "fixtures", volt: OPEN ? 0 : 1000, circ: null, cur: 0 };
+  const st = new Proxy(base, {
+    get: (t, k) => (CK.has(k) && t.circ ? t.circ[t.cur][k] : t[k]),
+    set: (t, k, v) => { if (CK.has(k) && t.circ) t.circ[t.cur][k] = v; else t[k] = v; return true; }
+  });
+  const NC = () => base.circ.length;
+  const letter = c => (NC() > 1 ? "AB"[c] : "");
+  const ccrId = c => (NC() > 1 ? T("CCR {c}", { c: "AB"[c] }) : T("CCR"));
+  // Run fn with circuit c as the current one
+  function inCirc(c, fn) { const save = base.cur; base.cur = c; try { return fn(); } finally { base.cur = save; } }
   let svg = null, raf = 0;
   const vText = v => (v === 0 ? T("continuity") : iso(v + " V"));
 
-  function newGame() {
-    cancelAnimationFrame(raf);
-    const N = LEVELS[st.level];
-    const faults = OPEN ? makeOpens(N, st.diff) : makeFaults(N, st.diff);
+  function makeCircuit(N, faults) {
     // Harmless wear that looks worrying: old tape on a joint, rust, mud
     const wear = new Map();
     for (let j = 1; j <= N; j++) {
@@ -44,22 +56,36 @@
     }
     const wet = new Set();
     for (let j = 1; j <= N; j++) if (Math.random() < 0.15) wet.add(j);
-    if (!OPEN) faults.forEach(f => { if (f.kind !== "span" && Math.random() < 0.7) wet.add(f.j); });
+    faults.forEach(f => { if (f.type === "earth" && f.kind !== "span" && Math.random() < 0.7) wet.add(f.j); });
     // Earth resistance from each base's can to the general mass of earth, Ω
     const re = [0.4];
     for (let j = 1; j <= N; j++) re.push(1.5 + Math.random() * 4);
-    Object.assign(st, {
-      N, faults, wet, wear, re, jumpers: [null, null], k: 0.8 + Math.random() * 0.5, isolated: false, cutout: false, lids: new Set(), unplugged: new Set(),
+    return { N, faults, wet, wear, re, jumpers: [null, null], k: 0.8 + Math.random() * 0.5, isolated: false, cutout: false,
+      lids: new Set(), unplugged: new Set(), measured: [], replaced: new Set(), secun: new Set(), step: 5, trip: null, clamp: false };
+  }
+
+  function newGame() {
+    cancelAnimationFrame(raf);
+    const nc = SIM && base.scen === "interleaved" ? 2 : 1;
+    const N = LEVELS[base.level] / nc;
+    const plan = SIM ? makeSim(N, base.diff, base.scen, nc) : [OPEN ? makeOpens(N, base.diff) : makeFaults(N, base.diff)];
+    base.circ = plan.map(f => makeCircuit(N, f));
+    base.cur = 0;
+    Object.assign(base, {
       loc: 0, clips: { red: null, black: null }, armed: null, drag: null, testing: false, t: 0, curve: [], reading: Infinity,
-      vOut: 0, dis: 0, vDis: 0, result: null, minutes: 0, warnings: 0, wrong: 0, tests: 0, opened: 0, log: [], measured: [], replaced: new Set(),
+      vOut: 0, dis: 0, vDis: 0, result: null, minutes: 0, warnings: 0, wrong: 0, tests: 0, opened: 0, log: [],
       done: false, alert: null
     });
+    if (SIM) base.circ.forEach((c, i) => inCirc(i, evalCCR));
     clearTimeout(alertTimer);
     renderAlert();
-    if (OPEN) say("info", () => (st.diff === "hard"
+    const faults = base.circ[0].faults;
+    if (SIM) say("info", () => T("Work order: the night inspection reported the runway edge lighting as faulty. Look at the lights on the map, then find and fix every fault and put the circuit back in service.") +
+      (NC() > 1 ? " " + T("This edge is fed by two interleaved circuits, A and B, from two CCRs.") : ""));
+    else if (OPEN) say("info", () => (base.diff === "hard"
       ? T("Work order: after snow clearing, the CCR on this runway edge circuit trips on open circuit. A plough hit several lights, so expect more than one break.")
       : T("Work order: the CCR on this runway edge circuit trips on open circuit and every light on it is out.")) + " " + T("Start in the vault: switch the CCR off and lock it out."));
-    else say("info", () => (st.diff === "hard" ? T("Work order: this old runway edge circuit has an earth fault alarm and has not been tested for years. Expect more than one weak spot.")
+    else say("info", () => (base.diff === "hard" ? T("Work order: this old runway edge circuit has an earth fault alarm and has not been tested for years. Expect more than one weak spot.")
       : faults[0].hv ? T("Work order: the CCR on this runway edge circuit trips on earth fault, but only at the high brightness steps.")
         : T("Work order: the CCR on this runway edge circuit shows an earth fault alarm.")) + " " + T("Start in the vault: switch the CCR off and lock it out."));
     render();
@@ -80,6 +106,7 @@
         : { kind: "span", k, p: k + 0.5, r0: 0.05 + Math.random() * 0.4 };
     }
     f.hv = diff !== "easy" && f.kind !== "txr" && !f.cut && Math.random() < (diff === "hard" ? 0.25 : 0.3);
+    f.type = "earth";
     return f;
   }
   function makeFaults(N, diff) {
@@ -100,10 +127,10 @@
   function oneOpen(N, diff, near) {
     const r = Math.random(), j = near || 1 + rnd(N);
     const vis = diff === "easy" || Math.random() < 0.5;
-    if (r < (near ? 0.6 : 0.45)) { const s = Math.random() < 0.5 ? -1 : 1; return { kind: "conn", j, s, p: j + 0.3 * s, how: vis ? "pulled" : "burnt" }; }
-    if (r < (near ? 1 : 0.7)) return { kind: "txr", j, p: j, vis };
+    if (r < (near ? 0.6 : 0.45)) { const s = Math.random() < 0.5 ? -1 : 1; return { type: "open", kind: "conn", j, s, p: j + 0.3 * s, how: vis ? "pulled" : "burnt" }; }
+    if (r < (near ? 1 : 0.7)) return { type: "open", kind: "txr", j, p: j, vis };
     const k = rnd(N + 1);
-    return { kind: "span", k, p: k + 0.5 };
+    return { type: "open", kind: "span", k, p: k + 0.5 };
   }
   function makeOpens(N, diff) {
     const want = diff === "hard" ? 2 + rnd(2) : 1, out = [];
@@ -115,7 +142,54 @@
     }
     return out;
   }
-  const allFixed = () => st.faults.every(f => f.fixed);
+  /* Simulator faults beyond the loop itself. At a light: a burnt-out lamp, a faulty fitting (a cracked
+     lens shows on most), a secondary connector that is corroded open (green pins once unplugged) or
+     leaking to earth (the light flickers), or a transformer with shorted turns (its secondary reads
+     far too low; some cases are discoloured by heat). At the vault: a CCR whose output current is
+     out of calibration, a blown control fuse, or a control board that trips on open circuit. */
+  function oneFixture(N, diff, j) {
+    const r = Math.random(), easy = diff === "easy";
+    j = j || 1 + rnd(N);
+    if (r < 0.35) return { type: "lamp", j, p: -1 };
+    if (r < 0.55) return { type: "fixture", j, p: -1, vis: easy || Math.random() < 0.6 };
+    if (r < 0.7) return { type: "secopen", j, p: -1 };
+    if (r < 0.8) return { type: "secleak", j, p: -1, vis: easy || Math.random() < 0.5 };
+    return { type: "txrshort", j, p: -1, vis: easy || Math.random() < 0.4 };
+  }
+  const oneCCR = () => ({ type: "ccr", sub: ["calib", "fuse", "board"][rnd(3)], p: -1 });
+  function makeSim(N, diff, scen, nc) {
+    const out = Array.from({ length: nc }, () => []);
+    const fixtures = (c, n) => {
+      for (let guard = 0, i = 0; i < n && guard < 40; guard++) {
+        const f = oneFixture(N, diff);
+        if (out[c].some(g => g.j === f.j && g.type === f.type)) continue;
+        out[c].push(f);
+        i++;
+      }
+    };
+    const count = diff === "easy" ? 1 : diff === "medium" ? 2 + rnd(2) : 4 + rnd(3);
+    if (scen === "fixtures") fixtures(0, count);
+    else if (scen === "ccr") {
+      out[0].push(oneCCR());
+      if (diff !== "easy") fixtures(0, diff === "medium" ? 1 : 2);
+      if (diff === "hard") out[0].push(Math.random() < 0.5 ? oneOpen(N, diff, 0) : oneFault(N, diff, 0));
+    } else if (scen === "interleaved") {
+      const c = rnd(2);
+      out[c].push(oneOpen(N, diff, 0));
+      if (diff !== "easy") fixtures(1 - c, diff === "medium" ? 1 : 3);
+      if (diff === "hard") { out[1 - c].push(oneFault(N, diff, 0)); if (Math.random() < 0.5) out[c].push(oneCCR()); }
+    } else {
+      const pick = [() => fixtures(0, 1), () => out[0].push(oneCCR()), () => out[0].push(oneOpen(N, diff, 0)), () => out[0].push(oneFault(N, diff, 0))];
+      const n = diff === "easy" ? 1 : diff === "medium" ? 2 : 3 + rnd(2);
+      for (let i = 0; i < n; i++) {
+        const k = rnd(4);
+        if (k === 1 && out[0].some(f => f.type === "ccr")) { fixtures(0, 1); continue; }
+        pick[k]();
+      }
+    }
+    return out;
+  }
+  const allFixed = () => base.circ.every(c => c.faults.every(f => f.fixed));
 
   // Text may be a function so the message follows a language switch
   function say(kind, text) { st.msg = { kind, text }; }
@@ -123,7 +197,7 @@
   let alertTimer = 0;
   // The event log: every measurement, step, repair and safety incident, stamped with the game clock.
   // Text is a function so entries follow a language switch.
-  function logEvent(kind, text) { st.log.unshift({ kind, text, at: st.minutes }); }
+  function logEvent(kind, text) { st.log.unshift({ kind, text, at: st.minutes, c: base.cur }); }
 
   function warn(text, at) {
     st.warnings++;
@@ -138,7 +212,7 @@
   /* ---------- Circuit model ---------- */
   function splits() {
     const out = [...st.unplugged].map(key => { const [j, s] = key.split(":").map(Number); return j + 0.25 * s; });
-    if (OPEN) st.faults.forEach(f => { if (!f.fixed) out.push(f.p); });   // a break splits the loop too
+    st.faults.forEach(f => { if (!f.fixed && f.type === "open") out.push(f.p); });   // a break splits the loop too
     return out;
   }
   // The piece of loop a terminal at x connects to, looking in direction d
@@ -147,8 +221,8 @@
     if (d > 0) return [x, Math.min(st.N + 1, ...sp.filter(v => v > x + 1e-9))];
     return [Math.max(0, ...sp.filter(v => v < x - 1e-9)), x];
   }
-  const pointName = x => (x <= 0 || x >= st.N + 1 ? T("the vault") : T("base {n}", { n: x }));
-  const placeName = j => (j === 0 ? T("Vault") : T("Base {n}", { n: j }));
+  const pointName = x => (x <= 0 || x >= st.N + 1 ? T("the vault") : T("base {n}", { n: letter(base.cur) + x }));
+  const placeName = j => (j === 0 ? T("Vault") : T("Base {n}", { n: letter(base.cur) + j }));
 
   function termInfo(id) {
     if (!id) return null;
@@ -158,7 +232,9 @@
       return p[1] === "out" ? { seg: segment(0, 1), x: 0, label: T("field OUT") } : { seg: segment(st.N + 1, -1), x: st.N + 1, label: T("field RET") };
     }
     const j = +p[1];
-    if (p[2] === "earth") return { earth: true, loc: j, label: T("base {n} earth", { n: j }) };
+    if (p[0] === "q") return { sec: j, side: p[2][0], pin: p[2][1],
+      label: p[2][0] === "L" ? T("lamp side of the secondary connector, pin {n}", { n: p[2][1] }) : T("transformer side of the secondary connector, pin {n}", { n: p[2][1] }) };
+    if (p[2] === "earth") return { earth: true, loc: j, label: T("base {n} earth", { n: letter(base.cur) + j }) };
     const s = +p[2], x = j + 0.25 * s;
     return p[3] === "cable" ? { seg: segment(x, s), x, label: T("cable to {p}", { p: pointName(j + s) }) }
       : { seg: segment(x, -s), x, label: T("transformer lead, {p} side", { p: pointName(j + s) }) };
@@ -176,6 +252,8 @@
       [-1, 1].forEach(s => {
         if (st.unplugged.has(j + ":" + s)) out.push({ id: `b:${j}:${s}:cable`, x: mx(s, 168), y: 560 }, { id: `b:${j}:${s}:txr`, x: mx(s, 217), y: 560 });
       });
+      if (st.secun.has(j)) out.push({ id: `q:${j}:L1`, x: 272, y: 376 }, { id: `q:${j}:L2`, x: 308, y: 376 },
+        { id: `q:${j}:T1`, x: 272, y: 404 }, { id: `q:${j}:T2`, x: 308, y: 404 });
     }
     return out;
   }
@@ -205,8 +283,8 @@
       const info = termInfo(jp.term);
       if (!info.earth) out.push({ x: info.x, seg: info.seg, loc: jp.loc, r: 0 });
     });
-    if (!OPEN) st.faults.forEach(f => {
-      if (!f.fixed && !f.hv) out.push({ x: f.p, seg: null, loc: null, r: f.r0 * 1e6 });
+    st.faults.forEach(f => {
+      if (f.type === "earth" && !f.fixed && !f.hv) out.push({ x: f.p, seg: null, loc: null, r: f.r0 * 1e6 });
     });
     return out;
   }
@@ -222,9 +300,28 @@
     });
     return best;
   }
+  /* The secondary side of one light: the lamp and fitting on one half of the secondary connector,
+     the transformer's secondary winding on the other. Isolated from the loop and from earth. */
+  const secFault = (j, ...types) => st.faults.find(f => !f.fixed && f.j === j && types.includes(f.type));
+  function secOhm(a, b) {
+    if (a.sec !== b.sec || a.side !== b.side) return Infinity;
+    if (a.pin === b.pin) return 0.02;
+    if (a.side === "L") return secFault(a.sec, "lamp", "fixture") ? Infinity : st.replaced.has(`l:${a.sec}`) ? 1.21 : 1.38;
+    return secFault(a.sec, "txrshort") ? 0.04 : 0.36;
+  }
+  function secIns(info, t) {
+    const healthy = st.k * 60000 * (1 - Math.exp(-t / 0.8)) * Math.pow(Math.max(t, 0.2) / 60, 0.5);
+    const leak = secFault(info.sec, "secleak");
+    return leak ? healthy * 0.3 / (healthy + 0.3) : healthy;
+  }
+
   function continuity() {
     const a = termInfo(st.clips.red), b = termInfo(st.clips.black);
     if (!a || !b) return { r: Infinity };
+    if (a.sec !== undefined || b.sec !== undefined) {
+      const r = a.sec !== undefined && b.sec !== undefined ? secOhm(a, b) : Infinity;
+      return { r: r <= MAXOHM ? r : Infinity };
+    }
     let res;
     if (a.earth && b.earth) res = { r: a.loc === b.loc ? 0.05 : reLoc(a.loc) + reLoc(b.loc) };
     else if (a.earth || b.earth) res = pathEarth(a.earth ? b : a, st.loc);
@@ -241,8 +338,8 @@
     let r = st.k * 20000 / len * (1 - Math.exp(-t / 1.2)) * Math.pow(Math.max(t, 0.2) / 60, 0.55);
     // An earthing jumper on this piece shorts it to earth
     if (st.jumpers.some(jp => jp && !termInfo(jp.term).earth && sameSeg(termInfo(jp.term).seg, seg))) return Math.min(r, 2e-5);
-    if (!OPEN) st.faults.forEach(f => {
-      if (f.fixed || f.p <= seg[0] || f.p >= seg[1] || (f.hv && st.volt < 2500)) return;
+    st.faults.forEach(f => {
+      if (f.type !== "earth" || f.fixed || f.p <= seg[0] || f.p >= seg[1] || (f.hv && st.volt < 2500)) return;
       const rf = f.r0 * (1 + 0.03 * t / 60);   // a leakage path barely changes with time
       r = r * rf / (r + rf);                   // faults on the same piece act in parallel
     });
@@ -252,6 +349,11 @@
     if (st.volt === 0) return continuity().r;
     const a = termInfo(st.clips.red), b = termInfo(st.clips.black);
     if (!a || !b) return Infinity;
+    if (a.sec !== undefined || b.sec !== undefined) {
+      if (a.sec !== undefined && b.sec !== undefined) return isFinite(secOhm(a, b)) ? 0 : secIns(a, t) + secIns(b, t);
+      const s2 = a.sec !== undefined ? a : b, o = a.sec !== undefined ? b : a;
+      return o.earth ? secIns(s2, t) : secIns(s2, t) + 2 * rIns(o.seg, t);
+    }
     if (a.earth && b.earth) return 0;
     if (a.earth || b.earth) return rIns((a.earth ? b : a).seg, t);
     if (a.seg[0] === b.seg[0] && a.seg[1] === b.seg[1]) return 0;   // both ends of one conductor: continuity
@@ -315,9 +417,9 @@
     let kind = "info", seg = null;
     if (!a || !b) kind = "leads";
     else if (a.earth !== b.earth) {
-      seg = (a.earth ? b : a).seg;
+      seg = (a.earth ? b : a).seg || null;
       kind = t < 3 ? "unsettled" : r < LOW ? "low" : "good";
-      if (kind !== "unsettled" && !OPEN) st.measured.push({ seg, low: kind === "low" });
+      if (kind !== "unsettled" && !OPEN && seg) st.measured.push({ seg, low: kind === "low" });
     }
     const reading = fmtR(r), pi = st.result.pi;
     logEvent(kind, measureText(st.loc, iso(st.volt + " V"), t, st.clips.red, st.clips.black, reading, pi));
@@ -327,13 +429,13 @@
       unsettled: ["info", T("You stopped before the reading settled: the cable was still charging. Hold the test for longer.")],
       low: ["bad", T("Low insulation: the short is on the conductor you tested.")],
       good: ["ok", T("Insulation good: the conductor you tested is clear at this voltage.")],
-      ...(OPEN ? { low: ["info", T("Near zero: an earthing jumper is on this piece of loop, so it is bonded to earth. Use the continuity range to look for the break.")] } : {}),
+      ...(jumperOn(a, b) ? { low: ["info", T("Near zero: an earthing jumper is on this piece of loop, so it is bonded to earth. Use the continuity range to look for the break.")] } : {}),
       info: ["info", a && b && a.earth && b.earth ? T("Both leads on earth: the tester reads a short, as it should.")
         : r === 0 ? T("Both leads on the same conductor: you measured its continuity, not its insulation. Put one lead on earth.")
           : T("Neither lead is on earth, so this reading is not an insulation test of one section.")]
     };
     say(...msgs[kind]);
-    if (kind === "good" && allFixed() && !OPEN) {
+    if (kind === "good" && allFixed() && !OPEN && !SIM && seg) {
       if (seg[0] === 0 && seg[1] === st.N + 1) finish();
       else say("ok", T("This piece is clear. The loop is still split somewhere: plug every connector back in and test the whole loop from the vault."));
     }
@@ -352,11 +454,25 @@
     render();
   }
 
+  // An insulation reading near zero on the open-circuit game is only explained by a jumper
+  function jumperOn(a, b) {
+    const c = a && b && (a.earth ? b : a);
+    return c && c.seg && st.jumpers.some(jp => jp && !termInfo(jp.term).earth && sameSeg(termInfo(jp.term).seg, c.seg));
+  }
+
   // A continuity measurement: logged, explained, and on the open-circuit game the way to finish
   function stopContinuity(t, r) {
     const a = termInfo(st.clips.red), b = termInfo(st.clips.black);
     let kind = isFinite(r) ? "cont" : "ol", text;
     if (!a || !b) { kind = "leads"; text = T("A lead is not connected, so the tester sees an open circuit."); }
+    else if (a.sec !== undefined || b.sec !== undefined) {
+      const both = a.sec !== undefined && b.sec !== undefined;
+      text = !both ? T("No continuity: the secondary side is isolated from the primary loop and from earth.")
+        : a.side !== b.side ? T("The two halves of an unplugged connector are not connected to each other.")
+          : isFinite(r) ? (a.side === "L" ? T("Lamp side: {r}. The lamp and the fitting are continuous.", { r: iso(fmtOhm(r)) })
+            : T("Transformer secondary: {r}. A healthy secondary winding reads about 0.3 Ω; far less points to shorted turns.", { r: iso(fmtOhm(r)) }))
+            : a.side === "L" ? T("Lamp side: open. The lamp is burnt out, or the fitting is faulty.") : T("Transformer secondary: open.");
+    }
     else if (a.earth && b.earth) text = T("Both leads on earth: the tester reads a short, as it should.");
     else if (a.earth || b.earth) {
       const c = a.earth ? b : a, path = pathEarth(c, st.loc);
@@ -374,7 +490,7 @@
     st.result = { r, t };
     logEvent(kind, measureText(st.loc, null, t, st.clips.red, st.clips.black, fmtOhm(r), null));
     say(kind === "cont" ? "ok" : kind === "ol" ? "bad" : "info", text);
-    if (OPEN && kind === "cont" && a && b && !a.earth && !b.earth && sameSeg(a.seg, b.seg) && a.seg[0] === 0 && a.seg[1] === st.N + 1 &&
+    if (OPEN && kind === "cont" && a && b && a.sec === undefined && b.sec === undefined && !a.earth && !b.earth && sameSeg(a.seg, b.seg) && a.seg[0] === 0 && a.seg[1] === st.N + 1 &&
       [a.x, b.x].includes(0) && [a.x, b.x].includes(st.N + 1) && allFixed()) {
       if (st.jumpers.some(Boolean)) say("bad", T("The loop is continuous again, but an earthing jumper is still on. Remove every jumper before the circuit goes back into service."));
       else finish();
@@ -394,20 +510,46 @@
   function finish() {
     st.done = true;
     st.clips = { red: null, black: null };
-    st.minutes += st.lids.size * COST.lidClose;
+    base.circ.forEach(c => { st.minutes += c.lids.size * COST.lidClose; });
     const k = Math.ceil(Math.log2(st.N + 1));
-    st.par = Math.round(COST.isolate + COST.cutout + 2 * COST.clip + 3 + st.faults.reduce((t, f) => t + k * 33 + COST[f.kind] + 10, 0) + 8);
+    const cost = f => COST[f.kind] || { lamp: COST.lamp, fixture: COST.fitting, secopen: COST.sec, secleak: COST.sec, txrshort: COST.txr,
+      ccr: COST[f.sub === "fuse" ? "fuse" : f.sub === "calib" ? "cal" : "board"] }[f.type] || 30;
+    const per = f => (f.type === "earth" || f.type === "open" ? k * 33 : 25) + cost(f) + 10;
+    st.par = Math.round(COST.isolate + COST.cutout + 2 * COST.clip + 3 + base.circ.reduce((t, c) => t + c.faults.reduce((u, f) => u + per(f), 0), 0) + 8);
     st.stars = st.warnings ? 1 : st.minutes <= st.par ? 3 : st.minutes <= st.par * 1.5 ? 2 : 1;
     logEvent("done", () => T("Circuit restored and handed back to operations."));
-    say("ok", () => OPEN ? T("The loop is continuous from OUT to RET and every jumper is off. Circuit restored.")
+    say("ok", () => SIM ? T("Every light is on, every fault is cleared and the lighting is back in service.")
+      : OPEN ? T("The loop is continuous from OUT to RET and every jumper is off. Circuit restored.")
       : st.faults.length > 1 ? T("Whole loop proved healthy from the vault. All {n} faults cleared.", { n: st.faults.length })
         : T("Whole loop proved healthy from the vault. Fault cleared."));
   }
 
+  /* ---------- The CCR, live (simulator) ---------- */
+  const ccrFault = sub => st.faults.find(f => !f.fixed && f.type === "ccr" && f.sub === sub);
+  const loopOpen = () => st.unplugged.size > 0 || st.faults.some(f => !f.fixed && f.type === "open");
+  // Decide what the CCR does when it is switched on: no control power, trip on open circuit, or run
+  function evalCCR() {
+    if (st.isolated) st.trip = null;
+    else if (ccrFault("fuse")) st.trip = "power";
+    else if (ccrFault("board") || (!st.cutout && loopOpen())) st.trip = "open";
+    else st.trip = null;
+  }
+  const running = () => SIM && !st.isolated && !st.trip;
+  // True-RMS output current, A; a CCR out of calibration delivers less than its display claims
+  const outAmps = () => (running() ? STEPS[st.step - 1] * (ccrFault("calib") ? 0.86 : 1) : 0);
+  const earthAlarm = () => running() && st.faults.some(f => f.type === "earth" && !f.fixed && (!f.hv || st.step >= 4));
+  // A light: 0 dark, otherwise its brightness; flicker for a secondary leaking to earth
+  function lightState(j) {
+    if (!running() || st.cutout) return { on: 0 };
+    if (secFault(j, "lamp", "fixture", "secopen", "txrshort")) return { on: 0 };
+    return { on: outAmps() / 6.6, flicker: !!secFault(j, "secleak") };
+  }
+
   /* ---------- Actions ---------- */
-  function placeOf(j) {
+  function placeOf(j) { return placeOfC(base.cur, j); }
+  function placeOfC(c, j) {
     if (j === 0) return [60, 150];
-    return layout().P[j];
+    return inCirc(c, () => positions().P[j]);
   }
 
   function placeClip(c, id) {
@@ -435,7 +577,7 @@
   function act(a, arg) {
     if (a === "new") { newGame(); return; }
     if (st.done) return;
-    const touch = ["term", "plug", "cutout", "fix-conn", "fix-txr", "dig"].includes(a);
+    const touch = ["term", "plug", "cutout", "fix-conn", "fix-txr", "dig", "secplug", "lamp", "fitting", "fix-sec"].includes(a);
     if (st.testing && a !== "test" && a !== "volt" && a !== "knob") {
       if (touch) touchDuringTest(spot(a, arg));
       else say("info", T("Stop the test first: press TEST again."));
@@ -452,19 +594,42 @@
     const live = () => { if (st.isolated) return false; warn(T("Stop: the circuit is live. Switch off and lock out the CCR in the vault first."), spot(a, arg)); return true; };
     switch (a) {
       case "go": {
-        if (arg === j) break;
-        const [x1, y1] = placeOf(j), [x2, y2] = placeOf(arg);
+        const [c2, j2] = typeof arg === "string" ? arg.split(":").map(Number) : [base.cur, arg];
+        if (j2 === j && (j2 === 0 || c2 === base.cur)) break;
+        const [x1, y1] = placeOf(j), [x2, y2] = placeOfC(c2, j2);
         st.minutes += 3 + (Math.abs(x2 - x1) + Math.abs(y2 - y1)) / 40;
-        st.loc = arg;
+        if (j2 !== 0) base.cur = c2;
+        st.loc = j2;
         st.clips = { red: null, black: null };
         st.armed = null;
-        say("info", arg === 0 ? T("You are in the vault.") : st.lids.has(arg) ? T("You are at base {n}. The base is open.", { n: arg }) + " " + observations(arg).join(" ")
-          : T("You are at base {n}. Click the base plate to open it.", { n: arg }));
+        const n = letter(base.cur) + j2;
+        say("info", j2 === 0 ? T("You are in the vault.") : st.lids.has(j2) ? T("You are at base {n}. The base is open.", { n }) + " " + observations(j2).join(" ")
+          : T("You are at base {n}. Click the base plate to open it.", { n }) + (SIM ? " " + fittingLook(j2) : ""));
         break;
       }
+      case "panel":
+        if (arg === base.cur) break;
+        base.cur = arg;
+        st.clips = { red: null, black: null };
+        st.armed = null;
+        say("info", T("You are at the panel of {c}.", { c: ccrId(arg) }));
+        break;
+      case "step":
+        st.step = arg;
+        { const c = ccrId(base.cur), n = arg; logEvent("act", () => T("{c} set to step {n}.", { c, n })); }
+        say("info", running() ? T("Step {n}: the CCR now regulates {i}.", { n: arg, i: iso(STEPS[arg - 1].toFixed(1) + " A") }) : T("Step {n} selected.", { n: arg }));
+        if (st.clamp) logClamp();
+        break;
+      case "clamp":
+        st.clamp = !st.clamp;
+        if (st.clamp) { st.minutes += 1; logClamp(); }
+        say("info", st.clamp ? T("Clamp meter on the CCR output cable: it reads {i} true RMS.", { i: iso(outAmps().toFixed(2) + " A") }) : T("Clamp meter removed."));
+        break;
       case "isolate":
+        if (st.isolated && SIM) { energize(); break; }
         if (st.isolated) { say("info", T("The CCR is already off and locked out. Keep your lock on it until the work is finished.")); break; }
         st.isolated = true;
+        st.trip = null;
         st.minutes += COST.isolate;
         logEvent("act", () => T("CCR switched off, locked out and tagged."));
         say("ok", T("CCR off, input breaker locked out and tagged. Now open the series cutout to reach the field cables."));
@@ -482,14 +647,14 @@
         st.lids.add(j);
         st.opened++;
         st.minutes += COST.lid;
-        logEvent("act", () => T("Base {n} opened.", { n: j }));
+        logEvent("act", () => T("Base {n} opened.", { n: letter(base.cur) + j }));
         say("info", T("Base open.") + " " + observations(j).join(" "));
         break;
       case "close":
         if ([-1, 1].some(s => st.unplugged.has(j + ":" + s))) { say("info", T("Plug both connectors back in before you close the base.")); break; }
         st.lids.delete(j);
         st.minutes += COST.lidClose;
-        logEvent("act", () => T("Base {n} closed.", { n: j }));
+        logEvent("act", () => T("Base {n} closed.", { n: letter(base.cur) + j }));
         checkClips();
         say("info", T("Base plate bolted back on."));
         break;
@@ -500,31 +665,73 @@
           st.unplugged.delete(key);
           st.minutes += COST.replug;
           say("info", T("Connector plugged back in and sealed."));
-          logEvent("act", () => T("Base {n}: connector towards {p} plugged back in.", { n: j, p: pointName(j + arg) }));
+          logEvent("act", () => T("Base {n}: connector towards {p} plugged back in.", { n: letter(base.cur) + j, p: pointName(j + arg) }));
         } else {
           st.unplugged.add(key);
           st.minutes += COST.unplug;
-          logEvent("act", () => T("Base {n}: connector towards {p} unplugged.", { n: j, p: pointName(j + arg) }));
+          logEvent("act", () => T("Base {n}: connector towards {p} unplugged.", { n: letter(base.cur) + j, p: pointName(j + arg) }));
           say("info", T("Connector unplugged: the loop is split here. Clip a lead onto either side.") +
             (OPEN && openConn(j, arg) && openConn(j, arg).how === "burnt" ? " " + T("The contact pin is burnt away.") : ""));
         }
         checkClips();
         break;
       }
+      case "secplug":
+        if (live()) break;
+        if (st.secun.has(j)) { st.secun.delete(j); st.minutes += COST.replug; say("info", T("Secondary connector plugged back in.")); }
+        else {
+          st.secun.add(j);
+          st.minutes += COST.unplug;
+          say("info", T("Secondary connector unplugged. Measure the lamp side and the transformer side on the continuity range.") +
+            (secFault(j, "secopen") ? " " + T("The pins are green with corrosion.") : ""));
+        }
+        { const n = letter(base.cur) + j, un = st.secun.has(j); logEvent("act", () => un ? T("Base {n}: secondary connector unplugged.", { n }) : T("Base {n}: secondary connector plugged back in.", { n })); }
+        checkClips();
+        break;
+      case "lamp": case "fitting": case "fix-sec": case "fix-fuse": case "fix-cal": case "fix-board": {
+        if (live()) break;
+        const types = { lamp: ["lamp"], fitting: ["lamp", "fixture"], "fix-sec": ["secopen", "secleak"] }[a];
+        const sub = { "fix-fuse": "fuse", "fix-cal": "calib", "fix-board": "board" }[a];
+        st.minutes += COST[{ lamp: "lamp", fitting: "fitting", "fix-sec": "sec", "fix-fuse": "fuse", "fix-cal": "cal", "fix-board": "board" }[a]];
+        const hits = st.faults.filter(f => !f.fixed && (sub ? f.type === "ccr" && f.sub === sub : f.j === j && types.includes(f.type)));
+        hits.forEach(f => { f.fixed = true; });
+        if (a === "lamp") st.replaced.add(`l:${j}`);
+        if (a === "fitting") { st.replaced.add(`l:${j}`); st.replaced.add(`f:${j}`); }
+        if (a === "fix-sec") st.replaced.add(`q:${j}`);
+        if (!hits.length) st.wrong++;
+        const n = letter(base.cur) + j, c = ccrId(base.cur);
+        const what = { lamp: () => T("Base {n}: lamp replaced.", { n }), fitting: () => T("Base {n}: light fitting replaced.", { n }),
+          "fix-sec": () => T("Base {n}: secondary connector replaced.", { n }), "fix-fuse": () => T("{c}: control fuse replaced.", { c }),
+          "fix-cal": () => T("{c}: output current recalibrated.", { c }), "fix-board": () => T("{c}: control board replaced.", { c }) }[a];
+        logEvent(hits.length ? "fix" : "wrong", () => what() + " " + (hits.length ? T("The old part was faulty.") : T("The old part was sound.")));
+        say(hits.length ? "ok" : "bad", hits.length ? what() + " " + T("Switch the CCR back on and look at the lights to check it.")
+          : what() + " " + T("Nothing changed: the old part was fine."));
+        break;
+      }
       case "fix-conn": case "fix-txr": case "dig": {
         if (live()) break;
         const kind = a === "fix-conn" ? "conn" : a === "fix-txr" ? "txr" : "span";
         st.minutes += COST[kind];
-        const hit = st.faults.find(f => !f.fixed && f.kind === kind &&
+        const hit = st.faults.find(f => !f.fixed && (f.type === "earth" || f.type === "open") && f.kind === kind &&
           (kind === "conn" ? f.j === j && f.s === arg : kind === "txr" ? f.j === j : f.k === Math.min(j, j + arg)));
+        // A new transformer also cures shorted turns
+        const short = kind === "txr" && st.faults.find(f => !f.fixed && f.type === "txrshort" && f.j === j);
+        if (short) short.fixed = true;
         // Whatever was wrong with it, the part is now brand new
-        const k = Math.min(j, j + arg);
+        const k = Math.min(j, j + arg), n = letter(base.cur) + j;
         st.replaced.add(kind === "conn" ? `c:${j}:${arg}` : kind === "txr" ? `t:${j}` : `s:${k}`);
-        logEvent(hit ? "fix" : "wrong", () => (kind === "conn" ? T("Base {n}: connector towards {p} replaced.", { n: j, p: pointName(j + arg) })
-          : kind === "txr" ? T("Base {n}: transformer replaced.", { n: j })
+        logEvent(hit || short ? "fix" : "wrong", () => (kind === "conn" ? T("Base {n}: connector towards {p} replaced.", { n, p: pointName(j + arg) })
+          : kind === "txr" ? T("Base {n}: transformer replaced.", { n })
             : T("Cable between {a} and {b} dug up and replaced.", { a: pointName(k), b: pointName(k + 1) })) + " " +
-          (hit ? T("The old part was faulty.") : T("The old part was sound.")));
-        if (hit && OPEN) {
+          (hit || short ? T("The old part was faulty.") : T("The old part was sound.")));
+        if (SIM && (hit || short)) {
+          if (hit) hit.fixed = true;
+          st.measured = [];
+          say("ok", T("Fault cleared: {what}.", { what: faultName(hit || short) }) + " " + T("Switch the CCR back on and look at the lights to check it."));
+        } else if (SIM) {
+          st.wrong++;
+          say("bad", T("The new part went in, but the old one was fine."));
+        } else if (hit && OPEN) {
           hit.fixed = true;
           st.measured = [];
           say("ok", (kind === "conn" ? T("You fitted a new connector. The joint is continuous again.")
@@ -564,7 +771,41 @@
         placeClip(st.armed || (!st.clips.red ? "red" : !st.clips.black ? "black" : "red"), arg);
         break;
     }
+    if (SIM && !st.done) checkSimDone();
     render();
+  }
+
+  function logClamp() {
+    const c = ccrId(base.cur), i = outAmps().toFixed(2), n = st.step;
+    logEvent("meter", () => T("{c}, step {n}: clamp meter reads {i} on the output.", { c, n, i: iso(i + " A") }));
+  }
+
+  // Switching back on: remove your lock, but only once the field is safe to energize
+  function energize() {
+    if (!st.cutout && (st.unplugged.size || st.secun.size || st.jumpers.some(Boolean))) {
+      warn(T("Stop: connectors are still unplugged or earthing jumpers are fitted in the field. Remake every joint and remove every jumper before you switch on."), [150, 530]);
+      return;
+    }
+    st.isolated = false;
+    st.minutes += COST.energize;
+    evalCCR();
+    const c = ccrId(base.cur), n = st.step, trip = st.trip, cut = st.cutout;
+    logEvent("act", () => trip === "power" ? T("{c}: lock removed, switched on: no response.", { c })
+      : trip === "open" ? T("{c}: switched on at step {n}: tripped on open circuit.", { c, n })
+        : cut ? T("{c}: switched on at step {n} into the shorted cutout.", { c, n }) : T("{c}: switched on at step {n}.", { c, n }));
+    say(st.trip === "power" ? "bad" : st.trip ? "bad" : "ok",
+      st.trip === "power" ? T("Nothing happens: the CCR display stays dark. It has no control power.")
+        : st.trip === "open" ? (st.cutout ? T("The CCR trips on open circuit even into the shorted cutout: the fault is in the CCR itself.")
+          : T("The CCR trips on open circuit: the loop is broken somewhere, or the CCR's own protection is faulty."))
+          : st.cutout ? T("The CCR runs into the short across the cutout. Clamp its output to check it regulates the right current.")
+            : T("The CCR is running. Look at the lights on the map."));
+    if (st.clamp) logClamp();
+  }
+
+  // The simulator ends when every fault is cleared and every circuit is lit and in service
+  function checkSimDone() {
+    const ok = allFixed() && base.circ.every((c, i) => inCirc(i, () => running() && !st.cutout && !st.unplugged.size && !st.secun.size && !st.jumpers.some(Boolean)));
+    if (ok) finish();
   }
 
   /* ---------- Drawing: circuit map ---------- */
@@ -576,58 +817,92 @@
       else P.push([910 - (i - m - 1) * (760 / (N - m - 1)), 240]);
     }
     P.push([100, 165]);
-    return { P, m };
+    return { P, m, L: P.map(([x, y]) => [x, y < 150 ? y + 28 : y - 28]), vx: 122, rx: 955 };
   }
-  function spanPath(k, P, m) {
+  /* Two interleaved circuits share the edge: their lights alternate A, B, A, B along it. Circuit A's
+     pits and cable run outside, circuit B's just inside, each with its own feed from the vault. */
+  function positions() {
+    if (NC() === 1) return layout();
+    const c = base.cur, N = st.N, M = 2 * N, mt = Math.ceil(M / 2);
+    const P = [[100, c ? 140 : 130]], L = [null];
+    let m = 0;
+    for (let i = 1; i <= N; i++) {
+      const q = 2 * (i - 1) + c, top = q < mt;
+      const x = top ? 150 + q * (760 / (mt - 1)) : 910 - (q - mt) * (760 / (M - mt - 1));
+      P.push([x, top ? (c ? 70 : 52) : (c ? 230 : 248)]);
+      L.push([x, top ? 90 : 210]);
+      if (top) m = i;
+    }
+    P.push([100, c ? 160 : 170]);
+    return { P, m, L, vx: c ? 132 : 122, rx: c ? 945 : 955 };
+  }
+  function spanPath(k, P, m, vx, rx) {
     const a = P[k], b = P[k + 1];
-    if (k === 0 || k === st.N) return `M${a[0]},${a[1]} H122 V${b[1]} H${b[0]}`;
-    if (k === m) return `M${a[0]},${a[1]} H955 V${b[1]} H${b[0]}`;
+    if (k === 0 || k === st.N) return `M${a[0]},${a[1]} H${vx} V${b[1]} H${b[0]}`;
+    if (k === m) return `M${a[0]},${a[1]} H${rx} V${b[1]} H${b[0]}`;
     return `M${a[0]},${a[1]} L${b[0]},${b[1]}`;
   }
   const btn = (act, arg, label) => ` data-act="${act}" data-arg="${arg}" data-key="${act}|${arg}" tabindex="0" role="button" aria-label="${esc(label)}"`;
 
-  function mapSvg() {
-    const { P, m } = layout(), N = st.N;
+  // One circuit's cable, pits and lights
+  function circuitSvg() {
+    const { P, m, L, vx, rx } = positions(), N = st.N, c = base.cur, two = NC() > 1;
     const spanState = new Array(N + 1).fill(""), baseState = new Array(N + 2).fill("");
     st.measured.forEach(({ seg, low }) => {
       for (let k = 0; k <= N; k++) if (k + 0.5 > seg[0] && k + 0.5 < seg[1]) spanState[k] = low ? "low" : "ok";
       for (let j = 1; j <= N; j++) if (j > seg[0] && j < seg[1]) baseState[j] = low ? "low" : "ok";
     });
-    let s = `<rect class="rwy" x="150" y="100" width="760" height="100" rx="4"/><path class="cl" d="M170,150 H890"/>
-      <text class="lab" x="530" y="140" text-anchor="middle">${esc(T("Runway"))}</text>`;
-    for (let k = 0; k <= N; k++) s += `<path class="span ${spanState[k]}" d="${spanPath(k, P, m)}"/>`;
-    const here = st.loc === 0;
-    s += `<g class="pick${here ? " on" : ""}"${btn("go", 0, T("Walk to the vault"))}>
-      <rect class="vault" x="20" y="105" width="80" height="90" rx="4"/>
-      <text class="lab${AGL.lang === "he" ? " small" : ""}" x="60" y="146" text-anchor="middle">${esc(T("Vault"))}</text>
-      <text class="lab small" x="60" y="162" text-anchor="middle">CCR</text>
-      ${st.isolated ? `<rect class="lock" x="49" y="177" width="22" height="14" rx="3"/><path class="lockbow" d="M54,177 v-3 a6,6 0 0 1 12,0 v3"/>` : ""}</g>`;
+    let s = "";
+    for (let k = 0; k <= N; k++) s += `<path class="span ${spanState[k]}${two ? " c" + "ab"[c] : ""}" d="${spanPath(k, P, m, vx, rx)}"/>`;
     for (let i = 1; i <= N; i++) {
-      const [x, y] = P[i], top = i <= m, open = st.lids.has(i), on = st.loc === i;
-      s += `<g class="pick${on ? " on" : ""}"${btn("go", i, T("Walk to base {n}", { n: i }) + (open ? ", " + T("open") : ""))}>
-        <rect class="hit" x="${x - 18}" y="${y - 30}" width="36" height="62"/>
-        <circle class="light" cx="${x}" cy="${top ? y + 28 : y - 28}" r="5"/>
-        <rect class="pit${open ? " open" : ""} ${baseState[i]}" x="${x - 11}" y="${y - 11}" width="22" height="22" rx="3"/>`;
+      const [x, y] = P[i], [lx, ly] = L[i], top = y < 150, open = st.lids.has(i), here = st.loc === i && hereCirc === c;
+      const ls = SIM ? lightState(i) : { on: 0 };
+      const name = letter(c) + i;
+      const lab = two ? (c ? [x, top ? 114 : 194] : [x, top ? y - 17 : y + 28]) : [x, top ? y - 17 : y + 28];
+      s += `<g class="pick${here ? " on" : ""}"${btn("go", two ? `${c}:${i}` : i, T("Walk to base {n}", { n: name }) + (open ? ", " + T("open") : "") +
+        (SIM ? ", " + (ls.on ? T("light on") : T("light off")) : ""))}>
+        <rect class="hit" x="${x - 16}" y="${Math.min(y, ly) - 14}" width="32" height="${Math.abs(ly - y) + 28}"/>
+        <circle class="light${SIM ? (ls.on ? (ls.flicker ? " lit flick" : " lit") : " dark") : ""}" cx="${lx}" cy="${ly}" r="${SIM ? 6 : 5}"${ls.on ? ` style="--glow:${(0.35 + 0.65 * ls.on).toFixed(2)}"` : ""}/>
+        <rect class="pit${open ? " open" : ""} ${baseState[i]}${two ? " c" + "ab"[c] : ""}" x="${x - (two ? 9 : 11)}" y="${y - (two ? 9 : 11)}" width="${two ? 18 : 22}" height="${two ? 18 : 22}" rx="3"/>`;
       [-1, 1].forEach(sd => {
-        if (st.unplugged.has(i + ":" + sd)) { const gx = x + (top ? sd : -sd) * 15; s += `<path class="gap" d="M${gx},${y - 9} V${y + 9}"/>`; }
+        if (st.unplugged.has(i + ":" + sd)) { const gx = x + (top ? sd : -sd) * (two ? 12 : 15); s += `<path class="gap" d="M${gx},${y - 9} V${y + 9}"/>`; }
       });
-      s += `<text class="num" x="${x}" y="${top ? y - 17 : y + 28}" text-anchor="middle">${i}</text></g>`;
+      s += `<text class="num${two ? " small" : ""}" x="${lab[0]}" y="${lab[1]}" text-anchor="middle">${name}</text></g>`;
     }
-    const [hx, hy] = placeOf(st.loc);
-    const py = st.loc === 0 ? 100 : hy < 150 ? hy - 36 : hy + 36;
-    s += st.loc === 0 ? "" : `<path class="here" d="M${hx},${py + (hy < 150 ? 6 : -6)} l-7,${hy < 150 ? -10 : 10} h14 Z"/>`;
     // Earthing jumpers left in place, marked where they are
     st.jumpers.forEach((jp, i) => {
       if (!jp) return;
-      const [x, y] = jp.loc === 0 ? [88, 112] : placeOf(jp.loc), dx = i * 10;
+      const [x, y] = jp.loc === 0 ? [88 + 0 * c, 112 + 76 * c] : P[jp.loc], dx = i * 10;
       s += `<g class="jmark" transform="translate(${x + 16 + dx},${jp.loc === 0 ? y : y < 150 ? y - 16 : y + 16})"><path d="M0,-7 V0 M-7,0 H7 M-4.5,4 H4.5 M-2,8 H2"/></g>`;
     });
     if (st.done) st.faults.forEach(f => {
+      if (f.type === "ccr") return;
       const [x, y] = f.kind === "span" ? [(P[f.k][0] + P[f.k + 1][0]) / 2, (P[f.k][1] + P[f.k + 1][1]) / 2] : P[f.j];
-      s += OPEN ? `<g class="fault"><circle cx="${x}" cy="${y}" r="17"/><path class="brk" d="M${x - 11},${y} H${x - 3} l2,-6 M${x + 11},${y} H${x + 3} l-2,6"/></g>`
-        : `<g class="fault"><circle cx="${x}" cy="${y}" r="17"/><path d="M${x + 3},${y - 11} L${x - 6},${y + 2} L${x},${y + 2} L${x - 3},${y + 11} L${x + 6},${y - 2} L${x},${y - 2} Z"/></g>`;
+      s += f.type === "open" ? `<g class="fault"><circle cx="${x}" cy="${y}" r="17"/><path class="brk" d="M${x - 11},${y} H${x - 3} l2,-6 M${x + 11},${y} H${x + 3} l-2,6"/></g>`
+        : f.type === "earth" ? `<g class="fault"><circle cx="${x}" cy="${y}" r="17"/><path d="M${x + 3},${y - 11} L${x - 6},${y + 2} L${x},${y + 2} L${x - 3},${y + 11} L${x + 6},${y - 2} L${x},${y - 2} Z"/></g>`
+          : `<g class="fault"><circle cx="${x}" cy="${y}" r="14"/></g>`;
     });
-    s += `<text class="lab small" x="20" y="288">${esc(T("Outgoing leg: bases 1–{m} · return leg: bases {m1}–{n} · click a base to walk there", { m, m1: m + 1, n: N }))}</text>`;
+    return s;
+  }
+  let hereCirc = 0;
+
+  function mapSvg() {
+    let s = `<rect class="rwy" x="150" y="100" width="760" height="100" rx="4"/><path class="cl" d="M170,150 H890"/>
+      <text class="lab" x="530" y="${NC() > 1 ? 156 : 140}" text-anchor="middle">${esc(T("Runway"))}</text>`;
+    hereCirc = base.cur;
+    base.circ.forEach((c, i) => { s += inCirc(i, circuitSvg); });
+    const anyLock = base.circ.some(c => c.isolated);
+    s += `<g class="pick${st.loc === 0 ? " on" : ""}"${btn("go", 0, T("Walk to the vault"))}>
+      <rect class="vault" x="20" y="105" width="80" height="90" rx="4"/>
+      <text class="lab${AGL.lang === "he" ? " small" : ""}" x="60" y="146" text-anchor="middle">${esc(T("Vault"))}</text>
+      <text class="lab small" x="60" y="162" text-anchor="middle">${NC() > 1 ? "CCR A · B" : "CCR"}</text>
+      ${anyLock ? `<rect class="lock" x="49" y="177" width="22" height="14" rx="3"/><path class="lockbow" d="M54,177 v-3 a6,6 0 0 1 12,0 v3"/>` : ""}</g>`;
+    const [hx, hy] = placeOf(st.loc);
+    const py = st.loc === 0 ? 100 : hy < 150 ? hy - 36 : hy + 36;
+    s += st.loc === 0 ? "" : `<path class="here" d="M${hx},${py + (hy < 150 ? 6 : -6)} l-7,${hy < 150 ? -10 : 10} h14 Z"/>`;
+    const m = Math.ceil(st.N / 2);
+    s += `<text class="lab small" x="20" y="288">${esc(NC() > 1 ? T("Interleaved circuits: A (orange) and B (blue) alternate along the edge · click a base to walk there")
+      : T("Outgoing leg: bases 1–{m} · return leg: bases {m1}–{n} · click a base to walk there", { m, m1: m + 1, n: st.N }))}</text>`;
     return s;
   }
 
@@ -637,22 +912,62 @@
       <text x="${x + w / 2}" y="${y + 17.5}" text-anchor="middle">${esc(label)}</text></g>`;
   }
 
+  // The simulator's CCR: display, alarm, step buttons, control fuse, breaker, clamp meter, repairs
+  function ccrSim() {
+    const c = letter(base.cur), lockd = st.isolated, fuse = ccrFault("fuse");
+    const disp = lockd ? T("OFF") : st.trip === "power" ? "" : st.trip === "open" ? T("TRIP") : `${T("Step {n}", { n: st.step })} · ${STEPS[st.step - 1].toFixed(1)} A`;
+    const alarm = st.trip === "open" ? T("Open circuit") : earthAlarm() ? T("Earth fault") : "";
+    let s = `<rect class="cab" x="40" y="345" width="170" height="320" rx="6"/>
+      <text class="lab" x="125" y="370" text-anchor="middle">CCR ${c}</text>
+      <rect class="ccr-disp${st.trip === "power" ? " dead" : ""}" x="56" y="380" width="138" height="32" rx="4"/>
+      <text class="ccr-t" x="125" y="402" text-anchor="middle">${esc(disp)}</text>`;
+    if (alarm) s += `<circle class="alarm" cx="62" cy="428" r="7"/><text class="lab small" x="76" y="433">${esc(alarm)}</text>`;
+    for (let n = 1; n <= 5; n++) {
+      s += `<g class="act-g stepbtn${st.step === n ? " on" : ""}"${btn("step", n, T("Step {n}", { n }))}><rect x="${48 + (n - 1) * 31}" y="444" width="27" height="24" rx="4"/>
+        <text x="${61.5 + (n - 1) * 31}" y="461" text-anchor="middle">${n}</text></g>`;
+    }
+    s += `<g class="look">${title(fuse ? T("The control fuse indicator has popped out: the fuse is blown.") : T("Control fuse intact."))}
+      <rect class="fuse" x="50" y="486" width="46" height="18" rx="4"/><rect class="fuse-cap" x="66" y="489" width="14" height="12" rx="2"/>
+      ${fuse ? `<circle class="fuse-flag" cx="73" cy="482" r="5"/>` : ""}</g>
+      <text class="lab tiny" x="73" y="520" text-anchor="middle">${esc(T("Control fuse"))}</text>
+      <g class="act-g"${btn("isolate", "", lockd ? T("Remove your lock and switch the CCR on") : T("Input breaker: switch off and lock out"))}>
+      <rect class="brk" x="112" y="480" width="78" height="96" rx="6"/>
+      <rect class="brk-h${lockd ? "" : " on"}" x="139" y="${lockd ? 532 : 490}" width="24" height="34" rx="4"/>
+      ${lockd ? `<rect class="lock" x="168" y="544" width="20" height="15" rx="3"/><path class="lockbow" d="M172,544 v-4 a6,6 0 0 1 12,0 v4"/>` : ""}
+      <text class="lab small" x="125" y="598" text-anchor="middle">${esc(T("Input breaker"))}</text>
+      <text class="lab small ${lockd ? "okt" : "hint"}" x="125" y="620" text-anchor="middle">${esc(lockd ? T("Off, locked out") : T("Click to switch off"))}</text>
+      <text class="lab small hint" x="125" y="640" text-anchor="middle">${esc(lockd ? T("Click to switch on") : T("and lock out"))}</text></g>`;
+    // Clamp meter on the output cable between the CCR and the cutout
+    s += `<g class="act-g clampm${st.clamp ? " on" : ""}"${btn("clamp", "", st.clamp ? T("Remove the clamp meter") : T("Clamp a meter on the CCR output"))}>
+      <rect class="hit" x="214" y="506" width="46" height="80"/>
+      ${st.clamp ? `<rect class="clamp-lcd" x="212" y="508" width="50" height="22" rx="3"/><text class="clamp-t" x="237" y="524" text-anchor="middle">${outAmps().toFixed(2)}</text>
+        <text class="lab tiny" x="237" y="542" text-anchor="middle">A RMS</text>
+        <path class="clamp-jaw" d="M228,556 a9,9 0 1 1 18,0 v14 a9,9 0 1 1 -18,0 Z"/>`
+        : `<path class="clamp-jaw idle" d="M228,556 a9,9 0 1 1 18,0 v14 a9,9 0 1 1 -18,0 Z"/><text class="lab tiny hint" x="237" y="600" text-anchor="middle">${esc(T("clamp"))}</text>`}</g>`;
+    s += chip(430, 452, 134, T("New fuse ({m} min)", { m: COST.fuse }), "fix-fuse", "") +
+      chip(430, 484, 134, T("Recalibrate ({m} min)", { m: COST.cal }), "fix-cal", "") +
+      chip(430, 516, 134, T("New board ({m} min)", { m: COST.board }), "fix-board", "");
+    if (NC() > 1) [0, 1].forEach(i => { s += chip(300 + i * 68, 310, 62, "CCR " + "AB"[i], "panel", i, base.cur === i ? "primary" : ""); });
+    return s;
+  }
+
   function vaultSvg() {
     const live = !st.isolated;
-    let s = `<text class="ins-title" x="30" y="328">${esc(T("Vault: CCR and series cutout"))}</text>
-      <rect class="cab" x="40" y="345" width="170" height="320" rx="6"/>
+    let s = `<text class="ins-title" x="30" y="328">${esc(T("Vault: CCR and series cutout"))}</text>`;
+    if (!SIM) s += `<rect class="cab" x="40" y="345" width="170" height="320" rx="6"/>
       <text class="lab" x="125" y="372" text-anchor="middle">CCR</text>
       <rect class="ccr-disp" x="70" y="385" width="110" height="32" rx="4"/>
       <text class="ccr-t" x="125" y="407" text-anchor="middle">${esc(live ? (OPEN ? T("Tripped") : T("Step {n}", { n: 3 })) : T("OFF"))}</text>`;
-    if (live) s += `<circle class="alarm" cx="125" cy="438" r="8"/><text class="lab small" x="125" y="465" text-anchor="middle">${esc(OPEN ? T("Open circuit") : T("Earth fault"))}</text>`;
-    s += `<g class="act-g"${btn("isolate", "", T("Input breaker: switch off and lock out"))}>
+    if (live && !SIM) s += `<circle class="alarm" cx="125" cy="438" r="8"/><text class="lab small" x="125" y="465" text-anchor="middle">${esc(OPEN ? T("Open circuit") : T("Earth fault"))}</text>`;
+    if (SIM) s += ccrSim();
+    else s += `<g class="act-g"${btn("isolate", "", T("Input breaker: switch off and lock out"))}>
       <rect class="brk" x="88" y="478" width="74" height="104" rx="6"/>
       <rect class="brk-h${live ? " on" : ""}" x="113" y="${live ? 490 : 536}" width="24" height="34" rx="4"/>
       <text class="lab small" x="125" y="602" text-anchor="middle">${esc(T("Input breaker"))}</text>
       <text class="lab small ${live ? "hint" : "okt"}" x="125" y="624" text-anchor="middle">${esc(live ? T("Click to switch off") : T("Off, locked out"))}</text>
       ${live ? `<text class="lab small hint" x="125" y="642" text-anchor="middle">${esc(T("and lock out"))}</text>`
-        : `<rect class="lock" x="146" y="548" width="22" height="16" rx="3"/><path class="lockbow" d="M151,548 v-4 a6,6 0 0 1 12,0 v4"/>`}</g>
-      <path class="wire" d="M210,560 H262 M210,578 H262"/>
+        : `<rect class="lock" x="146" y="548" width="22" height="16" rx="3"/><path class="lockbow" d="M151,548 v-4 a6,6 0 0 1 12,0 v4"/>`}</g>`;
+    s += `<path class="wire" d="M210,560 H262 M210,578 H262"/>
       <rect class="cab" x="262" y="345" width="160" height="320" rx="6"/>
       <text class="lab" x="342" y="372" text-anchor="middle">${esc(T("Series cutout"))}</text>
       <rect class="cut-base" x="280" y="440" width="124" height="170" rx="6"/>
@@ -667,6 +982,7 @@
         <text class="lab small hint" x="342" y="632" text-anchor="middle">${esc(T("Click to pull the plug"))}</text></g>`;
     } else {
       s += `<text class="lab small" x="300" y="562" text-anchor="middle">OUT</text><text class="lab small" x="384" y="562" text-anchor="middle">RET</text>
+        ${SIM ? `<path class="shortlink" d="M296,470 H388"/><text class="lab tiny" x="342" y="462" text-anchor="middle">${esc(T("CCR side shorted"))}</text>` : ""}
         <g class="act-g"${btn("cutout", "", T("Put the cutout plug back"))}>
         <rect class="cut-plug" x="440" y="350" width="104" height="70" rx="8"/><rect class="cut-handle" x="472" y="360" width="40" height="14" rx="7"/>
         <text class="lab small" x="492" y="402" text-anchor="middle">S-1</text>
@@ -678,10 +994,10 @@
   /* What a failed part looks like once the base is open. A wet connector shows a split boot with
      carbon tracking to the can wall, a dry crack only a hairline, and a failed transformer a scorched,
      swollen and cracked case. Buried cable faults cannot be seen from a base. */
-  const connFault = (j, s) => !OPEN && st.faults.find(f => !f.fixed && f.kind === "conn" && f.j === j && f.s === s);
-  const openConn = (j, s) => OPEN && st.faults.find(f => !f.fixed && f.kind === "conn" && f.j === j && f.s === s);
-  // In the open-circuit game only a transformer that burnt open visibly shows it
-  const txrFault = j => st.faults.some(f => !f.fixed && f.kind === "txr" && f.j === j && (!OPEN || f.vis));
+  const connFault = (j, s) => st.faults.find(f => !f.fixed && f.type === "earth" && f.kind === "conn" && f.j === j && f.s === s);
+  const openConn = (j, s) => st.faults.find(f => !f.fixed && f.type === "open" && f.kind === "conn" && f.j === j && f.s === s);
+  // Only a transformer that burnt open with visible damage shows it on the open-circuit faults
+  const txrFault = j => st.faults.some(f => !f.fixed && f.kind === "txr" && f.j === j && (f.type === "earth" || (f.type === "open" && f.vis)));
 
   function connLook(j, s) {
     const p = pointName(j + s), w = st.wear.get(j);
@@ -694,8 +1010,22 @@
     if (w.tape === s) return T("The connector towards {p} is wrapped in old tape. Untidy, but that alone is no proof of a fault.", { p });
     return "";
   }
+  // The light fitting on top of the base, as seen without opening it
+  function fittingLook(j) {
+    if (st.replaced.has(`f:${j}`)) return T("A new light fitting, fitted today.");
+    const f = st.faults.find(x => !x.fixed && x.type === "fixture" && x.j === j && x.vis);
+    return f ? T("The lens of the light fitting is cracked and there is water inside.") : "";
+  }
+  function secLook(j) {
+    if (st.replaced.has(`q:${j}`)) return T("A new secondary connector, fitted today.");
+    if (secFault(j, "secopen") && st.secun.has(j)) return T("The secondary connector pins are green with corrosion.");
+    const leak = st.faults.find(x => !x.fixed && x.type === "secleak" && x.j === j && x.vis);
+    return leak ? T("The secondary connector boot is split and wet inside.") : "";
+  }
+  const txrHot = j => st.faults.some(f => !f.fixed && f.type === "txrshort" && f.j === j && f.vis);
   function txrLook(j) {
-    if (txrFault(j)) return OPEN ? T("The transformer case is scorched and swollen: the primary winding may have burnt open.")
+    if (txrHot(j) && !txrFault(j)) return T("The transformer case is discoloured by heat.");
+    if (txrFault(j)) return st.faults.some(f => !f.fixed && f.kind === "txr" && f.j === j && f.type === "open") ? T("The transformer case is scorched and swollen: the primary winding may have burnt open.")
       : T("The transformer case is scorched, swollen and cracked, with potting compound oozing out.");
     if (isNewTxr(j)) return T("A new transformer, fitted today.");
     if (st.wear.get(j).rust) return T("There is surface rust on the transformer case.");
@@ -704,7 +1034,7 @@
   function observations(j) {
     const out = [st.wet.has(j) ? T("There is water in the bottom of the can.") : T("The can is dry.")];
     if (st.wear.get(j).mud) out.push(T("Mud has washed in through the conduits."));
-    const parts = [connLook(j, -1), connLook(j, 1), txrLook(j)].filter(Boolean);
+    const parts = [connLook(j, -1), connLook(j, 1), txrLook(j), SIM ? secLook(j) : ""].filter(Boolean);
     return out.concat(parts.length ? parts : [T("The connectors and the transformer look sound.")]);
   }
   const title = text => `<title>${esc(text)}</title>`;
@@ -734,7 +1064,7 @@
 
   function canSvg(j) {
     const open = st.lids.has(j);
-    let s = `<text class="ins-title" x="30" y="328">${esc(T("Base {n}", { n: j }))} · ${esc(T("L-867 base can"))}</text>`;
+    let s = `<text class="ins-title" x="30" y="328">${esc(T("Base {n}", { n: letter(base.cur) + j }))} · ${esc(T("L-867 base can"))}</text>`;
     [-1, 1].forEach(sd => {
       s += `<path class="cable" d="M${mx(sd, 22)},560 H${mx(sd, 150)}"/>
         <text class="lab small" x="${mx(sd, 26)}" y="548" text-anchor="${sd < 0 ? "start" : "end"}">${esc(T("to {p}", { p: pointName(j + sd) }))}</text>`;
@@ -742,20 +1072,24 @@
     if (!open) {
       let bolts = "";
       for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; bolts += `<circle class="bolt" cx="${290 + 132 * Math.cos(a)}" cy="${515 + 132 * Math.sin(a)}" r="6"/>`; }
+      const ls = SIM ? lightState(j) : { on: 0 }, cracked = SIM && fittingLook(j) && !st.replaced.has(`f:${j}`);
       return s + `<g class="act-g"${btn("lid", "", T("Open the base"))}>
         <circle class="plate" cx="290" cy="515" r="150"/>${bolts}
-        <circle class="fixture" cx="290" cy="490" r="32"/><circle class="lens" cx="290" cy="490" r="17"/>
+        <circle class="fixture" cx="290" cy="490" r="32"/><circle class="lens${SIM ? (ls.on ? (ls.flicker ? " lit flick" : " lit") : " dark") : ""}" cx="290" cy="490" r="17"${ls.on ? ` style="--glow:${(0.35 + 0.65 * ls.on).toFixed(2)}"` : ""}/>
+        ${cracked ? `<path class="lenscrack" d="M280,478 l8,9 l-3,6 l9,8 M296,480 l-5,8"/>` : ""}
         <text class="lab" x="290" y="565" text-anchor="middle">${esc(T("Base plate bolted on"))}</text>
-        <text class="lab small hint" x="290" y="588" text-anchor="middle">${esc(T("Click to open it ({m} min)", { m: COST.lid }))}</text></g>`;
+        <text class="lab small hint" x="290" y="588" text-anchor="middle">${esc(T("Click to open it ({m} min)", { m: COST.lid }))}</text></g>` + fittingChips();
     }
     s += `<circle class="can-in" cx="290" cy="515" r="150"/>`;
     if (st.wear.get(j).mud) s += `<path class="mud" d="M180,630 q40,-16 90,-4 q50,10 70,-2 q10,18 -40,26 q-70,8 -120,-20 Z"/>`;
     if (st.wet.has(j)) s += `<ellipse class="water" cx="290" cy="622" rx="118" ry="28"/>`;
     s += `<rect class="lug" x="278" y="642" width="24" height="14" rx="2"/>
       <text class="lab small" x="270" y="653" text-anchor="end">${esc(T("can earth"))}</text>
-      <path class="wire" d="M275,420 V385 M305,420 V385"/><text class="lab small" x="290" y="378" text-anchor="middle">${esc(T("to the lamp"))}</text>
+      ${SIM ? `<path class="wire" d="M275,420 V405 M305,420 V405 M290,368 V352"/><text class="lab small" x="300" y="360">${esc(T("to the lamp"))}</text>`
+        : `<path class="wire" d="M275,420 V385 M305,420 V385"/><text class="lab small" x="290" y="378" text-anchor="middle">${esc(T("to the lamp"))}</text>`}
       <g class="look">${title(txrLook(j) || T("Transformer case clean and intact."))}
       ${txrFault(j) ? `<path class="txr" d="M343,426 Q374,452 343,480 Z"/>` : ""}
+      ${txrHot(j) && !txrFault(j) ? `<ellipse class="heat" cx="300" cy="452" rx="40" ry="24"/>` : ""}
       <rect class="txr${isNewTxr(j) ? " fresh" : ""}" x="235" y="420" width="110" height="64" rx="8"/>
       ${st.wear.get(j).rust && !isNewTxr(j) ? `<g class="rust"><circle cx="243" cy="428" r="5"/><circle cx="251" cy="426" r="3"/><circle cx="339" cy="477" r="4"/><circle cx="243" cy="476" r="3"/></g>` : ""}
       ${txrFault(j) ? `<path class="scorch on-txr" d="M296,422 q20,-6 40,4 q12,16 4,34 q-6,20 -30,18 q-22,-2 -24,-22 q-6,-22 10,-34 Z"/>
@@ -781,6 +1115,29 @@
       s += chip(sd < 0 ? 20 : 446, 572, 114, T("Dig up ({h} h)", { h: COST.span / 60 }), "dig", sd);
     });
     s += chip(430, 310, 130, T("Close the base"), "close", "");
+    if (SIM) s += fittingChips() + secSvg(j);
+    return s;
+  }
+
+  // Lamp and fitting sit on top of the base, so they can be changed with it open or closed
+  function fittingChips() {
+    if (!SIM) return "";
+    return chip(16, 344, 128, T("New lamp ({m} min)", { m: COST.lamp }), "lamp", "") + chip(16, 376, 128, T("New fitting ({m} min)", { m: COST.fitting }), "fitting", "");
+  }
+
+  // The secondary circuit: transformer secondary leads, the secondary connector, and the lamp lead
+  function secSvg(j) {
+    const un = st.secun.has(j), fresh = st.replaced.has(`q:${j}`), corr = secFault(j, "secopen") && un;
+    const leak = st.faults.some(x => !x.fixed && x.type === "secleak" && x.j === j && x.vis);
+    let s = `<g class="act-g plug"${btn("secplug", "", un ? T("Plug the secondary connector back in") : T("Unplug the secondary connector"))}>${title(secLook(j) || T("Secondary connector clean and intact."))}
+      <rect class="hit" x="258" y="356" width="64" height="62"/>`;
+    if (!un) s += `<rect class="conn c${fresh ? " fresh" : ""}" x="262" y="383" width="56" height="14" rx="4"/><rect class="conn t${fresh ? " fresh" : ""}" x="262" y="397" width="56" height="12" rx="4"/>`;
+    else s += `<rect class="conn c${fresh ? " fresh" : ""}" x="262" y="362" width="56" height="12" rx="4"/><rect class="conn t${fresh ? " fresh" : ""}" x="262" y="408" width="56" height="10" rx="3"/>
+      ${corr ? `<circle class="corrode" cx="272" cy="376" r="5"/><circle class="corrode" cx="308" cy="376" r="5"/>` : ""}`;
+    if (leak && !fresh) s += `<path class="crack thin" d="M300,${un ? 363 : 384} l3,4 l-3,4"/>`;
+    s += `</g><text class="lab tiny" x="256" y="${un ? 392 : 395}" text-anchor="end">${esc(T("secondary"))}</text>`;
+    if (fresh) s += `<text class="lab tiny newtag" x="324" y="${un ? 392 : 395}">${esc(T("NEW"))}</text>`;
+    s += chip(330, 384, 104, T("Replace ({m} min)", { m: COST.sec }), "fix-sec", "");
     return s;
   }
 
@@ -793,12 +1150,21 @@
   }
 
   function faultName(f) {
-    if (OPEN) return f.kind === "conn" ? (f.how === "pulled" ? T("a pulled-apart connector in base {n}, on the side towards {p}", { n: f.j, p: pointName(f.j + f.s) })
-      : T("a connector with a burnt-open contact in base {n}, on the side towards {p}", { n: f.j, p: pointName(f.j + f.s) }))
-      : f.kind === "txr" ? T("a transformer with an open primary winding in base {n}", { n: f.j })
+    const n = letter(base.cur) + f.j, c = ccrId(base.cur);
+    const simName = {
+      lamp: () => T("a burnt-out lamp at base {n}", { n }), fixture: () => T("a faulty light fitting at base {n}", { n }),
+      secopen: () => T("a corroded secondary connector at base {n}", { n }), secleak: () => T("a secondary connector leaking to earth at base {n}", { n }),
+      txrshort: () => T("a transformer with shorted turns at base {n}", { n }),
+      ccr: () => ({ calib: T("{c}: output current out of calibration", { c }), fuse: T("{c}: blown control fuse", { c }),
+        board: T("{c}: faulty control board tripping on open circuit", { c }) })[f.sub]
+    }[f.type];
+    if (simName) return simName();
+    if (f.type === "open") return f.kind === "conn" ? (f.how === "pulled" ? T("a pulled-apart connector in base {n}, on the side towards {p}", { n, p: pointName(f.j + f.s) })
+      : T("a connector with a burnt-open contact in base {n}, on the side towards {p}", { n, p: pointName(f.j + f.s) }))
+      : f.kind === "txr" ? T("a transformer with an open primary winding in base {n}", { n })
         : T("a broken cable between {a} and {b}", { a: pointName(f.k), b: pointName(f.k + 1) });
-    const where = f.kind === "conn" ? T("a waterlogged connector in base {n}, on the side towards {p}", { n: f.j, p: pointName(f.j + f.s) })
-      : f.kind === "txr" ? T("a failed isolating transformer in base {n}", { n: f.j })
+    const where = f.kind === "conn" ? T("a waterlogged connector in base {n}, on the side towards {p}", { n, p: pointName(f.j + f.s) })
+      : f.kind === "txr" ? T("a failed isolating transformer in base {n}", { n })
         : f.cut ? T("a dead short: cable cut through between {a} and {b}", { a: pointName(f.k), b: pointName(f.k + 1) })
           : T("damaged cable between {a} and {b}", { a: pointName(f.k), b: pointName(f.k + 1) });
     return where + (f.hv ? " " + T("(a dry crack that only broke down at 2500 V and above)") : "");
@@ -806,13 +1172,15 @@
 
   function resultSvg() {
     let s = `<text class="fg-stars" x="30" y="352">${"★".repeat(st.stars)}${"☆".repeat(3 - st.stars)}</text>
-      <text class="ins-title" x="30" y="390">${esc(T(st.faults.length > 1 ? "All faults cleared in {h} h {m} min" : "Fault cleared in {h} h {m} min", { h: Math.floor(st.minutes / 60), m: Math.round(st.minutes % 60) }))}</text>`;
+      <text class="ins-title" x="30" y="390">${esc(T(base.circ.reduce((t, c) => t + c.faults.length, 0) > 1 ? "All faults cleared in {h} h {m} min" : "Fault cleared in {h} h {m} min", { h: Math.floor(st.minutes / 60), m: Math.round(st.minutes % 60) }))}</text>`;
     let y = 418;
     const add = (text, cls, max, lh) => { const w = wrap(text, 30, y, max || 62, cls, lh || 22); s += w.svg; y += w.h + 6; };
-    if (st.faults.length === 1) add(OPEN ? T("The break was {where}.", { where: faultName(st.faults[0]) }) : T("The short was {where}.", { where: faultName(st.faults[0]) }), "lab");
+    const all = [];
+    base.circ.forEach((c, i) => c.faults.forEach(f => all.push(inCirc(i, () => faultName(f)))));
+    if (all.length === 1) add(SIM ? T("The fault was {where}.", { where: all[0] }) : OPEN ? T("The break was {where}.", { where: all[0] }) : T("The short was {where}.", { where: all[0] }), "lab");
     else {
-      add(OPEN ? T("There were {n} breaks:", { n: st.faults.length }) : T("There were {n} faults:", { n: st.faults.length }), "lab");
-      st.faults.forEach((f, i) => add(`${i + 1}. ${faultName(f)}`, "lab small", 70, 18));
+      add(OPEN ? T("There were {n} breaks:", { n: all.length }) : T("There were {n} faults:", { n: all.length }), "lab");
+      all.forEach((f, i) => add(`${i + 1}. ${f}`, "lab small", 70, 18));
     }
     add(T("Par for this circuit, splitting it in half each time, is about {p} min.", { p: st.par }) + " " +
       T("{t} tests, {w} wrong repairs.", { t: st.tests, w: st.wrong }), "lab small", 70, 18);
@@ -897,7 +1265,7 @@
       const sag = Math.min(694, Math.max(jy, y) + 50);
       s += `<path class="lead ${c}" d="M${jx},${jy} C${jx - 40},${sag} ${x + 30},${sag} ${x},${y}"/>`;
     });
-    if (OPEN) {
+    if (JUMP) {
       s += `<text class="lab tiny jtray" x="112" y="684">${esc(T("Earthing jumpers"))}</text>`;
       [0, 1].forEach(i => {
         const c = "j" + i, pos = clipPos(c);
@@ -932,6 +1300,9 @@
     if (a === "fix-txr") return [290, 452];
     if (a === "dig") return [mx(arg, 70), 560];
     if (a === "cutout") return [342, 512];
+    if (a === "secplug" || a === "fix-sec") return [290, 392];
+    if (a === "lamp" || a === "fitting") return st.lids.has(st.loc) ? [80, 360] : [290, 490];
+    if (a === "fix-fuse" || a === "fix-cal" || a === "fix-board") return [125, 400];
     return [290, 500];
   }
 
@@ -992,7 +1363,7 @@
     renderLive();
     AGL.bidiSvg(svg);
     if (key) { const el = svg.querySelector(`[data-key="${CSS.escape(key)}"]`); if (el) el.focus({ preventScroll: true }); }
-    svg.setAttribute("aria-label", T("Runway edge circuit with {n} light bases", { n: st.N }));
+    svg.setAttribute("aria-label", T("Runway edge circuit with {n} light bases", { n: st.N * NC() }));
     const msg = host.querySelector(".fg-msg");
     msg.className = "feedback fg-msg " + st.msg.kind;
     msg.textContent = typeof st.msg.text === "function" ? st.msg.text() : st.msg.text;
@@ -1007,14 +1378,15 @@
       `<div class="readout${i === 4 && st.warnings ? " warn" : ""}"><span class="k">${esc(k)}</span><span class="v"><bdi dir="ltr">${esc(v)}</bdi></span></div>`).join("");
     const pill = { low: ["on-bad", T("Low")], good: ["on-ok", T("Good")], unsettled: ["", T("Not settled")], leads: ["", T("Lead off")], info: ["", T("Check")],
       cont: ["on-ok", T("Continuous")], ol: ["on-bad", T("Break")], act: ["", T("Action")], fix: ["on-ok", T("Repair")],
-      wrong: ["on-bad", T("Wrong repair")], safety: ["on-bad", T("Safety")], done: ["on-ok", T("Done")] };
+      wrong: ["on-bad", T("Wrong repair")], safety: ["on-bad", T("Safety")], done: ["on-ok", T("Done")], meter: ["", T("Reading")] };
     const clock = m => `${Math.floor(m / 60)}:${String(Math.floor(m % 60)).padStart(2, "0")}`;
     host.querySelector(".fg-log").innerHTML = st.log.length
       ? st.log.map(l => `<li><span class="fg-at"><bdi dir="ltr">${clock(l.at)}</bdi></span><span class="pill ${pill[l.kind][0]}">${esc(pill[l.kind][1])}</span>
-        <span>${esc(typeof l.text === "function" ? l.text() : l.text)}</span></li>`).join("")
+        <span>${esc(typeof l.text === "function" ? inCirc(l.c, l.text) : l.text)}</span></li>`).join("")
       : `<li class="muted">${esc(T("Nothing in the log yet."))}</li>`;
     host.querySelectorAll(".fg-level button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.level === st.level)));
     host.querySelectorAll(".fg-diff button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.diff === st.diff)));
+    host.querySelectorAll(".fg-scen button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.scen === base.scen)));
   }
 
   /* ---------- Input ---------- */
@@ -1105,6 +1477,13 @@
       const b = e.target.closest("button");
       if (!b) return;
       st.diff = b.dataset.diff;
+      newGame();
+    });
+    const scen = host.querySelector(".fg-scen");
+    if (scen) scen.addEventListener("click", e => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      base.scen = b.dataset.scen;
       newGame();
     });
     host.querySelector(".fg-new").addEventListener("click", newGame);

@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Hebrew:wght@400;500;600&family=Heebo:wght@500;700;800&display=swap">
 <!-- Bump ?v= on every release so browsers and CDNs fetch the new CSS and JS -->
-<link rel="stylesheet" href="css/agl.css?v=20261105">
+<link rel="stylesheet" href="css/agl.css?v=20261106">
 </head>
 <body>
 
@@ -731,6 +731,55 @@
       </article>
 
       <article class="lesson">
+        <h3>Lighting fault simulator</h3>
+        <p class="lede-small">The runway edge lighting is live: every light on the map shows whether it is on. Read the pattern of dark lights and the CCR's alarms, then find and fix every fault, from a burnt-out lamp to the CCR itself, and put the lighting back in service.</p>
+        <details class="more">
+          <summary>How to play</summary>
+          <div class="prose">
+            <ol>
+              <li>Read the map first. One light out points at that light: lamp, fitting, secondary connector or transformer. Every light on a circuit out points at the CCR or the loop. Every other light out on an interleaved edge is one whole circuit.</li>
+              <li>In the vault, the CCR shows its step, current and alarms. Clamp the meter on its output to read the true current: a CCR out of calibration still displays 6.6 A. A dark display means no control power: check the control fuse.</li>
+              <li>To test the CCR itself, lock it out, pull the cutout plug (the CCR side is then shorted) and switch it on. A healthy CCR regulates into the short; one that still trips on open circuit has a faulty control board.</li>
+              <li>At a light, change the lamp or the fitting from above. Open the base to unplug the secondary connector and measure each side on the continuity range: the lamp side reads about 1.4 Ω, the transformer secondary about 0.3 Ω. Far less means shorted turns.</li>
+              <li>Lock out before any work and remake every joint and remove every jumper before you switch on again. The job is done when every light is on and every alarm is clear.</li>
+            </ol>
+          </div>
+        </details>
+        <div id="fs" class="fg-game" data-mode="sim">
+          <div class="controls">
+            <span class="ctl-label">Scenario
+              <span class="seg fg-scen">
+                <button type="button" data-scen="fixtures" aria-pressed="true">Light fittings</button>
+                <button type="button" data-scen="ccr" aria-pressed="false">CCR</button>
+                <button type="button" data-scen="interleaved" aria-pressed="false">Interleaved circuits</button>
+                <button type="button" data-scen="mixed" aria-pressed="false">Mixed</button>
+              </span>
+            </span>
+            <span class="ctl-label">Circuit size
+              <span class="seg fg-level">
+                <button type="button" data-level="easy" aria-pressed="false">12 lights</button>
+                <button type="button" data-level="normal" aria-pressed="true">24 lights</button>
+                <button type="button" data-level="hard" aria-pressed="false">40 lights</button>
+              </span>
+            </span>
+            <span class="ctl-label">Difficulty
+              <span class="seg fg-diff">
+                <button type="button" data-diff="easy" aria-pressed="false">Easy</button>
+                <button type="button" data-diff="medium" aria-pressed="true">Medium</button>
+                <button type="button" data-diff="hard" aria-pressed="false">Hard</button>
+              </span>
+            </span>
+            <button type="button" class="btn fg-new">New fault</button>
+          </div>
+          <div class="readouts fg-stats"></div>
+          <p class="scroll-hint">Swipe the diagram sideways to see all of it.</p>
+          <div class="feedback fg-msg info" aria-live="polite"></div>
+          <div class="sld-wrap fg-map"></div>
+          <div class="panel"><h4>Event log</h4><ol class="fg-log"></ol></div>
+        </div>
+      </article>
+
+      <article class="lesson">
         <h3>Preventive maintenance at a glance</h3>
         <div class="table-wrap">
           <table class="stack">
@@ -838,21 +887,21 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="js/data.js?v=20261105"></script>
-<script src="js/detail-data.js?v=20261105"></script>
-<script src="js/vault-data.js?v=20261105"></script>
-<script src="js/he.js?v=20261105"></script>
-<script src="js/he-static.js?v=20261105"></script>
-<script src="js/i18n.js?v=20261105"></script>
-<script src="js/airfield.js?v=20261105"></script>
-<script src="js/circuit.js?v=20261105"></script>
-<script src="js/calc.js?v=20261105"></script>
-<script src="js/learn.js?v=20261105"></script>
-<script src="js/detail3d.js?v=20261105"></script>
-<script src="js/vault.js?v=20261105"></script>
-<script src="js/vault3d.js?v=20261105"></script>
-<script src="js/faultgame.js?v=20261105"></script>
-<script src="js/flows.js?v=20261105"></script>
-<script src="js/app.js?v=20261105"></script>
+<script src="js/data.js?v=20261106"></script>
+<script src="js/detail-data.js?v=20261106"></script>
+<script src="js/vault-data.js?v=20261106"></script>
+<script src="js/he.js?v=20261106"></script>
+<script src="js/he-static.js?v=20261106"></script>
+<script src="js/i18n.js?v=20261106"></script>
+<script src="js/airfield.js?v=20261106"></script>
+<script src="js/circuit.js?v=20261106"></script>
+<script src="js/calc.js?v=20261106"></script>
+<script src="js/learn.js?v=20261106"></script>
+<script src="js/detail3d.js?v=20261106"></script>
+<script src="js/vault.js?v=20261106"></script>
+<script src="js/vault3d.js?v=20261106"></script>
+<script src="js/faultgame.js?v=20261106"></script>
+<script src="js/flows.js?v=20261106"></script>
+<script src="js/app.js?v=20261106"></script>
 </body>
 </html>

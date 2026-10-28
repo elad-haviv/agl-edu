@@ -1203,3 +1203,37 @@ label.field.inline select { min-width: 180px; }
 .fg .conn.fresh { fill: #20262b; stroke: #e6edf2; stroke-width: 1.5; }
 .fg .txr.fresh { fill: #2f3942; stroke: #e6edf2; }
 .fg .can-in ~ .lab.newtag { fill: #136b37; font-weight: 700; letter-spacing: 0.06em; }
+
+/* Lighting fault simulator: live lights, the CCR panel, interleaved circuits */
+.fg .light.lit { fill: #fff3b0; stroke: #e0b400; stroke-width: 1.5; filter: drop-shadow(0 0 4px rgba(255, 214, 64, var(--glow, 1))); opacity: var(--glow, 1); }
+.fg .light.dark { fill: #4d5761; stroke: var(--sign-black); }
+.fg .light.flick, .fg .lens.flick { animation: fg-flick 0.7s steps(3) infinite; }
+@keyframes fg-flick { 0% { opacity: 1; } 40% { opacity: 0.25; } 70% { opacity: 0.85; } }
+.fg .lens.lit { fill: #fff3b0; filter: drop-shadow(0 0 10px rgba(255, 214, 64, 0.9)); opacity: var(--glow, 1); }
+.fg .lens.dark { fill: #59636c; }
+.fg .lenscrack { fill: none; stroke: #15202a; stroke-width: 1.6; }
+.fg .span.ca { stroke: var(--c-a); stroke-opacity: 0.9; }
+.fg .span.cb { stroke: var(--c-b); stroke-opacity: 0.9; }
+.fg .span.ca.ok, .fg .span.cb.ok { stroke: var(--ok); }
+.fg .span.ca.low, .fg .span.cb.low { stroke: var(--bad); }
+.fg .pit.ca { stroke: var(--c-a); stroke-width: 2.5; }
+.fg .pit.cb { stroke: var(--c-b); stroke-width: 2.5; }
+.fg .num.small { font-size: 12px; }
+.fg .ccr-disp.dead { fill: #1a1f24; }
+.fg .stepbtn rect { fill: var(--surface); stroke: var(--ink); stroke-width: 1.2; }
+.fg .stepbtn text { font-family: var(--f-display); font-weight: 700; font-size: 14px; fill: var(--ink); }
+.fg .stepbtn.on rect { fill: var(--sign-black); }
+.fg .stepbtn.on text { fill: var(--sign-yellow); }
+.fg .stepbtn:hover rect, .fg .stepbtn:focus-visible rect { stroke: var(--accent); stroke-width: 2.5; }
+.fg .fuse { fill: #d7dde2; stroke: #15202a; }
+.fg .fuse-cap { fill: #3a4148; }
+.fg .fuse-flag { fill: var(--sign-red); stroke: #15202a; }
+.fg .clamp-lcd { fill: #c9d6b8; stroke: #15202a; }
+.fg .clamp-t { font-family: var(--f-display); font-weight: 700; font-size: 15px; fill: #1b2410; }
+.fg .clamp-jaw { fill: none; stroke: #f4b400; stroke-width: 6; }
+.fg .clamp-jaw.idle { stroke: var(--muted); stroke-dasharray: 4 3; stroke-width: 3; }
+.fg .clampm:hover .clamp-jaw, .fg .clampm:focus-visible .clamp-jaw { stroke: var(--accent); }
+.fg .shortlink { stroke: var(--sign-yellow); stroke-width: 5; stroke-linecap: round; }
+.fg .heat { fill: #8a5a2b; fill-opacity: 0.55; pointer-events: none; }
+.fg .corrode { fill: #9fd6a8; stroke: #3c8a54; stroke-width: 1.5; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .fg .light.flick, .fg .lens.flick { animation: none; opacity: 0.6; } }
