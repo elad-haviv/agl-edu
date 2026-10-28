@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Hebrew:wght@400;500;600&family=Heebo:wght@500;700;800&display=swap">
 <!-- Bump ?v= on every release so browsers and CDNs fetch the new CSS and JS -->
-<link rel="stylesheet" href="css/agl.css?v=20261107">
+<link rel="stylesheet" href="css/agl.css?v=20261108">
 </head>
 <body>
 
@@ -249,6 +249,34 @@
             </table>
           </div>
           <p class="small muted">3-step regulators (common on taxiways) use 4.8, 5.5 and 6.6 A. *Intensity for a typical halogen lamp; LED fixtures are driven to their own curve.</p>
+        </div>
+      </article>
+
+      <article class="lesson">
+        <h3>How a CCR works</h3>
+        <p class="lede-small">Inside every CCR the same loop runs: measure the output current, compare it with the step that was asked for, and change the output voltage until they match. Select any block to see what it does and how it fails, then run the regulator on a load of your choice.</p>
+        <div id="ccr-how" class="cd">
+          <div class="controls"><span class="ctl-label">Power stage
+            <span class="seg cd-tech"><button type="button" data-tech="scr" aria-pressed="true">Thyristor</button><button type="button" data-tech="igbt" aria-pressed="false">IGBT / PWM</button></span></span></div>
+          <div class="sld-wrap cd-diagram"></div>
+          <div class="panel cd-info" aria-live="polite"></div>
+          <h4>The regulator at work</h4>
+          <div class="calc-layout">
+            <div class="section">
+              <div class="controls"><span class="ctl-label">Step
+                <span class="seg cd-step"><button type="button" data-step="1">B1</button><button type="button" data-step="2">B2</button><button type="button" data-step="3">B3</button><button type="button" data-step="4">B4</button><button type="button" data-step="5" aria-pressed="true">B5</button></span></span></div>
+              <div class="grid-2">
+                <label class="field">Lights on the circuit: <span class="cd-lamps-v">40</span><input type="range" class="cd-lamps" min="10" max="160" step="2" value="40"></label>
+                <label class="field">CCR rating<select class="cd-kva"></select></label>
+              </div>
+              <div class="panel cd-wave-host"></div>
+            </div>
+            <div class="panel result">
+              <table class="result-table"><tbody class="cd-read"></tbody></table>
+              <p class="cd-note feedback"></p>
+            </div>
+          </div>
+          <p class="small muted">A typical edge light with its isolating transformer presents about 4.6 Ω to the loop at 6.6 A. The grey curve is the full 6.6 A sine for comparison. Ratings and impedances are typical training figures.</p>
         </div>
       </article>
 
@@ -890,21 +918,22 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="js/data.js?v=20261107"></script>
-<script src="js/detail-data.js?v=20261107"></script>
-<script src="js/vault-data.js?v=20261107"></script>
-<script src="js/he.js?v=20261107"></script>
-<script src="js/he-static.js?v=20261107"></script>
-<script src="js/i18n.js?v=20261107"></script>
-<script src="js/airfield.js?v=20261107"></script>
-<script src="js/circuit.js?v=20261107"></script>
-<script src="js/calc.js?v=20261107"></script>
-<script src="js/learn.js?v=20261107"></script>
-<script src="js/detail3d.js?v=20261107"></script>
-<script src="js/vault.js?v=20261107"></script>
-<script src="js/vault3d.js?v=20261107"></script>
-<script src="js/faultgame.js?v=20261107"></script>
-<script src="js/flows.js?v=20261107"></script>
-<script src="js/app.js?v=20261107"></script>
+<script src="js/data.js?v=20261108"></script>
+<script src="js/detail-data.js?v=20261108"></script>
+<script src="js/vault-data.js?v=20261108"></script>
+<script src="js/he.js?v=20261108"></script>
+<script src="js/he-static.js?v=20261108"></script>
+<script src="js/i18n.js?v=20261108"></script>
+<script src="js/airfield.js?v=20261108"></script>
+<script src="js/circuit.js?v=20261108"></script>
+<script src="js/calc.js?v=20261108"></script>
+<script src="js/learn.js?v=20261108"></script>
+<script src="js/detail3d.js?v=20261108"></script>
+<script src="js/vault.js?v=20261108"></script>
+<script src="js/vault3d.js?v=20261108"></script>
+<script src="js/faultgame.js?v=20261108"></script>
+<script src="js/flows.js?v=20261108"></script>
+<script src="js/ccr.js?v=20261108"></script>
+<script src="js/app.js?v=20261108"></script>
 </body>
 </html>

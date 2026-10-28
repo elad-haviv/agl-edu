@@ -576,7 +576,7 @@
       if (j <= a.p || j >= b.p) continue;
       let lamps = 0;
       for (let q = Math.ceil(a.p + 1e-9); q < b.p; q++) lamps++;
-      const rSec = lamps * 25 + cond(a.p, b.p), rEarth = (a.r0 + b.r0) * 1e6 + 2;
+      const rSec = lamps * 4.6 + cond(a.p, b.p), rEarth = (a.r0 + b.r0) * 1e6 + 2;
       return rEarth / (rEarth + rSec);
     }
     return 1;

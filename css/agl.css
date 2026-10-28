@@ -1237,3 +1237,31 @@ label.field.inline select { min-width: 180px; }
 .fg .heat { fill: #8a5a2b; fill-opacity: 0.55; pointer-events: none; }
 .fg .corrode { fill: #9fd6a8; stroke: #3c8a54; stroke-width: 1.5; pointer-events: none; }
 @media (prefers-reduced-motion: reduce) { .fg .light.flick, .fg .lens.flick { animation: none; opacity: 0.6; } }
+
+/* How a CCR works */
+.cd { display: flex; flex-direction: column; gap: var(--sp-4); }
+.cd-diagram svg { display: block; width: 100%; min-width: 820px; height: auto; }
+.cd-block rect { stroke-width: 2; cursor: pointer; }
+.cd-block.pwr rect { fill: var(--sign-black); stroke: #5b6670; }
+.cd-block.pwr text { fill: var(--sign-yellow); }
+.cd-block.ctl rect { fill: var(--sign-yellow); stroke: var(--sign-black); }
+.cd-block.ctl text { fill: var(--sign-black); }
+.cd-block text { font-family: var(--f-body); font-size: 13.5px; font-weight: 600; pointer-events: none; }
+.cd-block:hover rect, .cd-block:focus-visible rect { stroke: var(--accent); stroke-width: 4; }
+.cd-block:focus { outline: none; }
+.cd-block.on rect { stroke: var(--accent-fill); stroke-width: 5; filter: drop-shadow(0 0 6px rgba(255, 198, 41, 0.6)); }
+.cd-power { stroke: var(--ink); stroke-width: 5; fill: none; }
+.cd-sig { stroke: var(--muted); stroke-width: 2; stroke-dasharray: 6 4; fill: none; }
+.cd-arrhead { fill: var(--muted); }
+.cd-earth { stroke: var(--muted); stroke-width: 2; }
+.cd-row { font-family: var(--f-display); font-weight: 700; font-size: 14px; letter-spacing: 0.06em; text-transform: uppercase; fill: var(--muted); }
+.cd-lab { font-family: var(--f-body); font-size: 12px; font-weight: 600; fill: var(--muted); }
+.cd-info h4 { margin: 6px 0 4px; font-size: var(--step-1); }
+.cd-info p { margin: 0 0 8px; }
+.cd-fail { color: var(--ink); }
+.cd-wave-host svg { display: block; width: 100%; height: auto; }
+.cd-axis { stroke: var(--rule); stroke-width: 1.5; fill: none; }
+.cd-ref { fill: none; stroke: var(--rule); stroke-width: 2; stroke-dasharray: 4 4; }
+.cd-wave { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linejoin: round; }
+.cd-note { margin-top: var(--sp-3); }
+.cd input[type="range"] { width: 100%; accent-color: var(--accent-fill); }
