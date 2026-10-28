@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Hebrew:wght@400;500;600&family=Heebo:wght@500;700;800&display=swap">
 <!-- Bump ?v= on every release so browsers and CDNs fetch the new CSS and JS -->
-<link rel="stylesheet" href="css/agl.css?v=20261101">
+<link rel="stylesheet" href="css/agl.css?v=20261102">
 </head>
 <body>
 
@@ -614,6 +614,7 @@
               <li>Click a base on the map to walk there, click the base plate to open it and click a connector to unplug it. The loop is now split: clip onto the cable side or the transformer side and test each one.</li>
               <li>Only the piece that contains the short reads low. Keep splitting it until you know exactly which cable, connector or transformer has failed, then use its Replace or Dig up chip.</li>
               <li>Plug everything back in and prove the whole loop from the vault to finish.</li>
+              <li>Difficulty: Easy has one fault that shows at any test voltage. Medium may hide it as a dry crack that only breaks down at 2500 V or more. Hard has two to five faults, sometimes more than one in the same base, so a section can still read low after you fix one.</li>
             </ol>
             <p>Tip: hold a test for a full minute to get the polarization index. Healthy insulation keeps rising (PI about 2); a wet fault stays flat. Some faults are dry cracks that only show at 2500 V or more. When you open a base, look before you test: a burnt, tracked connector boot or a scorched, swollen transformer gives the fault away. Old tape, rust and mud look bad but are usually harmless, and a buried cable fault cannot be seen at all.</p>
           </div>
@@ -625,6 +626,13 @@
                 <button type="button" data-level="easy" aria-pressed="false">12 bases</button>
                 <button type="button" data-level="normal" aria-pressed="true">24 bases</button>
                 <button type="button" data-level="hard" aria-pressed="false">40 bases</button>
+              </span>
+            </span>
+            <span class="ctl-label">Difficulty
+              <span class="seg" id="fg-diff">
+                <button type="button" data-diff="easy" aria-pressed="false">Easy</button>
+                <button type="button" data-diff="medium" aria-pressed="true">Medium</button>
+                <button type="button" data-diff="hard" aria-pressed="false">Hard</button>
               </span>
             </span>
             <button type="button" class="btn" id="fg-new">New fault</button>
@@ -740,20 +748,20 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="js/data.js?v=20261101"></script>
-<script src="js/detail-data.js?v=20261101"></script>
-<script src="js/vault-data.js?v=20261101"></script>
-<script src="js/he.js?v=20261101"></script>
-<script src="js/he-static.js?v=20261101"></script>
-<script src="js/i18n.js?v=20261101"></script>
-<script src="js/airfield.js?v=20261101"></script>
-<script src="js/circuit.js?v=20261101"></script>
-<script src="js/calc.js?v=20261101"></script>
-<script src="js/learn.js?v=20261101"></script>
-<script src="js/detail3d.js?v=20261101"></script>
-<script src="js/vault.js?v=20261101"></script>
-<script src="js/vault3d.js?v=20261101"></script>
-<script src="js/faultgame.js?v=20261101"></script>
-<script src="js/app.js?v=20261101"></script>
+<script src="js/data.js?v=20261102"></script>
+<script src="js/detail-data.js?v=20261102"></script>
+<script src="js/vault-data.js?v=20261102"></script>
+<script src="js/he.js?v=20261102"></script>
+<script src="js/he-static.js?v=20261102"></script>
+<script src="js/i18n.js?v=20261102"></script>
+<script src="js/airfield.js?v=20261102"></script>
+<script src="js/circuit.js?v=20261102"></script>
+<script src="js/calc.js?v=20261102"></script>
+<script src="js/learn.js?v=20261102"></script>
+<script src="js/detail3d.js?v=20261102"></script>
+<script src="js/vault.js?v=20261102"></script>
+<script src="js/vault3d.js?v=20261102"></script>
+<script src="js/faultgame.js?v=20261102"></script>
+<script src="js/app.js?v=20261102"></script>
 </body>
 </html>

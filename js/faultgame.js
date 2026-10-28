@@ -3,7 +3,7 @@
    (the vault or a light base) and an insulation tester whose leads you clip on yourself.
    Loop positions: the vault OUT terminal is 0, base j sits at j, the vault RET terminal is N+1.
    Unplugging the primary connector on side s of base j (s = -1 towards base j-1, +1 towards j+1)
-   splits the loop at j + 0.25s. The hidden fault sits at p: in a cable span (k + 0.5), in a
+   splits the loop at j + 0.25s. Each hidden fault sits at p: in a cable span (k + 0.5), in a
    cable-side connector (j + 0.3s) or in the isolating transformer (j). */
 (function () {
   const LEVELS = { easy: 12, normal: 24, hard: 40 };
@@ -21,19 +21,13 @@
   const mmss = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
   const mx = (s, x) => (s < 0 ? x : 580 - x);   // mirror close-up geometry for the +1 side
 
-  const st = { level: "normal", volt: 1000 };
+  const st = { level: "normal", diff: "medium", volt: 1000 };
   let svg = null, raf = 0;
 
   function newGame() {
     cancelAnimationFrame(raf);
     const N = LEVELS[st.level];
-    const r = Math.random();
-    let fault;
-    if (r < 0.45) { const j = 1 + rnd(N), s = Math.random() < 0.5 ? -1 : 1; fault = { kind: "conn", j, s, p: j + 0.3 * s, r0: 0.3 + Math.random() * 2.5 }; }
-    else if (r < 0.65) { const j = 1 + rnd(N); fault = { kind: "txr", j, p: j, r0: 1 + Math.random() * 6 }; }
-    else { const k = rnd(N + 1); fault = { kind: "span", k, p: k + 0.5, r0: 0.05 + Math.random() * 0.4 }; }
-    // Some faults are dry cracks that only break down at a high test voltage
-    fault.hv = st.level !== "easy" && fault.kind !== "txr" && Math.random() < 0.3;
+    const faults = makeFaults(N, st.diff);
     // Harmless wear that looks worrying: old tape on a joint, rust, mud
     const wear = new Map();
     for (let j = 1; j <= N; j++) {
@@ -41,19 +35,50 @@
     }
     const wet = new Set();
     for (let j = 1; j <= N; j++) if (Math.random() < 0.15) wet.add(j);
-    if (fault.kind !== "span" && Math.random() < 0.7) wet.add(fault.j);
+    faults.forEach(f => { if (f.kind !== "span" && Math.random() < 0.7) wet.add(f.j); });
     Object.assign(st, {
-      N, fault, wet, wear, k: 0.8 + Math.random() * 0.5, isolated: false, cutout: false, lids: new Set(), unplugged: new Set(),
+      N, faults, wet, wear, k: 0.8 + Math.random() * 0.5, isolated: false, cutout: false, lids: new Set(), unplugged: new Set(),
       loc: 0, clips: { red: null, black: null }, armed: null, drag: null, testing: false, t: 0, curve: [], reading: Infinity,
       vOut: 0, dis: 0, vDis: 0, result: null, minutes: 0, warnings: 0, wrong: 0, tests: 0, opened: 0, log: [], measured: [],
-      fixed: false, done: false, alert: null
+      done: false, alert: null
     });
     clearTimeout(alertTimer);
     renderAlert();
-    say("info", () => (fault.hv ? T("Work order: the CCR on this runway edge circuit trips on earth fault, but only at the high brightness steps.")
-      : T("Work order: the CCR on this runway edge circuit shows an earth fault alarm.")) + " " + T("Start in the vault: switch the CCR off and lock it out."));
+    say("info", () => (st.diff === "hard" ? T("Work order: this old runway edge circuit has an earth fault alarm and has not been tested for years. Expect more than one weak spot.")
+      : faults[0].hv ? T("Work order: the CCR on this runway edge circuit trips on earth fault, but only at the high brightness steps.")
+        : T("Work order: the CCR on this runway edge circuit shows an earth fault alarm.")) + " " + T("Start in the vault: switch the CCR off and lock it out."));
     render();
   }
+
+  /* Difficulty: easy has one wet fault; medium may hide it as a dry crack that only breaks down at
+     2500 V and above; hard has 2 to 5 faults, sometimes more than one in the same base. Any cable
+     fault may be a dead short (a cable cut through, a few kΩ). */
+  function oneFault(N, diff, near) {
+    const r = Math.random();
+    const j = near || 1 + rnd(N);
+    let f;
+    if (r < (near ? 0.65 : 0.45)) { const s = Math.random() < 0.5 ? -1 : 1; f = { kind: "conn", j, s, p: j + 0.3 * s, r0: 0.3 + Math.random() * 2.5 }; }
+    else if (r < (near ? 1 : 0.65)) f = { kind: "txr", j, p: j, r0: 1 + Math.random() * 6 };
+    else {
+      const k = rnd(N + 1);
+      f = Math.random() < 0.3 ? { kind: "span", k, p: k + 0.5, cut: true, r0: 0.001 + Math.random() * 0.02 }
+        : { kind: "span", k, p: k + 0.5, r0: 0.05 + Math.random() * 0.4 };
+    }
+    f.hv = diff !== "easy" && f.kind !== "txr" && !f.cut && Math.random() < (diff === "hard" ? 0.25 : 0.3);
+    return f;
+  }
+  function makeFaults(N, diff) {
+    const want = diff === "hard" ? 2 + rnd(4) : 1, out = [];
+    const same = (a, b) => a.kind === b.kind && (a.kind === "span" ? a.k === b.k : a.j === b.j && (a.kind !== "conn" || a.s === b.s));
+    for (let guard = 0; out.length < want && guard < 50; guard++) {
+      // In hard games a base that already has a fault often has a second one
+      const host = out.find(f => f.kind !== "span");
+      const f = oneFault(N, diff, out.length && host && Math.random() < 0.35 ? host.j : 0);
+      if (!out.some(g => same(f, g))) out.push(f);
+    }
+    return out;
+  }
+  const allFixed = () => st.faults.every(f => f.fixed);
 
   // Text may be a function so the message follows a language switch
   function say(kind, text) { st.msg = { kind, text }; }
@@ -120,11 +145,11 @@
     const len = Math.max(0.3, seg[1] - seg[0]);
     // Healthy insulation: capacitive charging first, then dielectric absorption (PI about 2)
     let r = st.k * 20000 / len * (1 - Math.exp(-t / 1.2)) * Math.pow(Math.max(t, 0.2) / 60, 0.55);
-    const f = st.fault;
-    if (!st.fixed && f.p > seg[0] && f.p < seg[1] && (!f.hv || st.volt >= 2500)) {
+    st.faults.forEach(f => {
+      if (f.fixed || f.p <= seg[0] || f.p >= seg[1] || (f.hv && st.volt < 2500)) return;
       const rf = f.r0 * (1 + 0.03 * t / 60);   // a leakage path barely changes with time
-      r = r * rf / (r + rf);
-    }
+      r = r * rf / (r + rf);                   // faults on the same piece act in parallel
+    });
     return r;
   }
   function resistance(t) {
@@ -204,7 +229,7 @@
           : T("Neither lead is on earth, so this reading is not an insulation test of one section.")]
     };
     say(...msgs[kind]);
-    if (kind === "good" && st.fixed) {
+    if (kind === "good" && allFixed()) {
       if (seg[0] === 0 && seg[1] === st.N + 1) finish();
       else say("ok", T("This piece is clear. The loop is still split somewhere: plug every connector back in and test the whole loop from the vault."));
     }
@@ -228,9 +253,10 @@
     st.clips = { red: null, black: null };
     st.minutes += st.lids.size * COST.lidClose;
     const k = Math.ceil(Math.log2(st.N + 1));
-    st.par = Math.round(COST.isolate + COST.cutout + 2 * COST.clip + 3 + k * 33 + COST[st.fault.kind] + 18);
+    st.par = Math.round(COST.isolate + COST.cutout + 2 * COST.clip + 3 + st.faults.reduce((t, f) => t + k * 33 + COST[f.kind] + 10, 0) + 8);
     st.stars = st.warnings ? 1 : st.minutes <= st.par ? 3 : st.minutes <= st.par * 1.5 ? 2 : 1;
-    say("ok", () => T("Whole loop proved healthy from the vault. Fault cleared."));
+    say("ok", () => st.faults.length > 1 ? T("Whole loop proved healthy from the vault. All {n} faults cleared.", { n: st.faults.length })
+      : T("Whole loop proved healthy from the vault. Fault cleared."));
   }
 
   /* ---------- Actions ---------- */
@@ -316,16 +342,18 @@
       }
       case "fix-conn": case "fix-txr": case "dig": {
         if (live()) break;
-        const f = st.fault;
         const kind = a === "fix-conn" ? "conn" : a === "fix-txr" ? "txr" : "span";
         st.minutes += COST[kind];
-        const hit = !st.fixed && f.kind === kind && (kind === "conn" ? f.j === j && f.s === arg : kind === "txr" ? f.j === j : f.k === Math.min(j, j + arg));
+        const hit = st.faults.find(f => !f.fixed && f.kind === kind &&
+          (kind === "conn" ? f.j === j && f.s === arg : kind === "txr" ? f.j === j : f.k === Math.min(j, j + arg)));
         if (hit) {
-          st.fixed = true;
+          hit.fixed = true;
           st.measured = [];
-          say("ok", ({ conn: T("You cut out a connector with a split, waterlogged boot and fitted a new one."),
-            txr: T("The old transformer had a burnt primary winding. New transformer fitted."),
-            span: T("You found the cable crushed under an old trench repair and spliced in a new length.") })[kind] + " " +
+          say("ok", (kind === "conn" ? (hit.hv ? T("You cut out a connector with a hairline crack through its boot and fitted a new one.")
+            : T("You cut out a connector with a split, waterlogged boot and fitted a new one."))
+            : kind === "txr" ? T("The old transformer had a burnt primary winding. New transformer fitted.")
+              : hit.cut ? T("You found the cable sliced through where an earth rod was driven into the duct, and spliced in a new length.")
+                : T("You found the cable crushed under an old trench repair and spliced in a new length.")) + " " +
             T("Plug everything back in and prove the whole loop from the vault."));
         } else {
           st.wrong++;
@@ -402,11 +430,10 @@
     const [hx, hy] = placeOf(st.loc);
     const py = st.loc === 0 ? 100 : hy < 150 ? hy - 36 : hy + 36;
     s += st.loc === 0 ? "" : `<path class="here" d="M${hx},${py + (hy < 150 ? 6 : -6)} l-7,${hy < 150 ? -10 : 10} h14 Z"/>`;
-    if (st.done) {
-      const f = st.fault;
+    if (st.done) st.faults.forEach(f => {
       const [x, y] = f.kind === "span" ? [(P[f.k][0] + P[f.k + 1][0]) / 2, (P[f.k][1] + P[f.k + 1][1]) / 2] : P[f.j];
       s += `<g class="fault"><circle cx="${x}" cy="${y}" r="17"/><path d="M${x + 3},${y - 11} L${x - 6},${y + 2} L${x},${y + 2} L${x - 3},${y + 11} L${x + 6},${y - 2} L${x},${y - 2} Z"/></g>`;
-    }
+    });
     s += `<text class="lab small" x="20" y="288">${esc(T("Outgoing leg: bases 1–{m} · return leg: bases {m1}–{n} · click a base to walk there", { m, m1: m + 1, n: N }))}</text>`;
     return s;
   }
@@ -458,12 +485,12 @@
   /* What a failed part looks like once the base is open. A wet connector shows a split boot with
      carbon tracking to the can wall, a dry crack only a hairline, and a failed transformer a scorched,
      swollen and cracked case. Buried cable faults cannot be seen from a base. */
-  const connFault = (j, s) => !st.fixed && st.fault.kind === "conn" && st.fault.j === j && st.fault.s === s;
-  const txrFault = j => !st.fixed && st.fault.kind === "txr" && st.fault.j === j;
+  const connFault = (j, s) => st.faults.find(f => !f.fixed && f.kind === "conn" && f.j === j && f.s === s);
+  const txrFault = j => st.faults.some(f => !f.fixed && f.kind === "txr" && f.j === j);
 
   function connLook(j, s) {
     const p = pointName(j + s), w = st.wear.get(j);
-    if (connFault(j, s)) return st.fault.hv ? T("There is a fine hairline crack in the cable-side boot of the connector towards {p}.", { p })
+    if (connFault(j, s)) return connFault(j, s).hv ? T("There is a fine hairline crack in the cable-side boot of the connector towards {p}.", { p })
       : T("The cable-side boot of the connector towards {p} is split, with black carbon tracking from the crack to the can wall.", { p });
     if (w.tape === s) return T("The connector towards {p} is wrapped in old tape. Untidy, but that alone is no proof of a fault.", { p });
     return "";
@@ -490,7 +517,7 @@
     }
     if (connFault(j, sd)) {
       const cx = x(un ? 160 : 166);
-      if (st.fault.hv) s += `<path class="crack thin" d="M${cx},552 l2,5 l-2,4 l2,5"/>`;
+      if (connFault(j, sd).hv) s += `<path class="crack thin" d="M${cx},552 l2,5 l-2,4 l2,5"/>`;
       else s += `<ellipse class="scorch" cx="${x(158)}" cy="560" rx="${un ? 16 : 22}" ry="15"/>
         <path class="crack" d="M${cx},551 l3,5 l-3,4 l3,5 l-2,4"/>
         <path class="track" d="M${cx},553 q${-sd * -6},-6 ${x(147) - cx},-9 M${cx},567 q${-sd * -5},6 ${x(147) - cx},10 M${x(156)},556 l${x(148) - x(156)},-3"/>`;
@@ -556,20 +583,28 @@
     return { svg: lines.map((l, i) => `<text class="${cls}" x="${x}" y="${y + i * lh}">${esc(l)}</text>`).join(""), h: lines.length * lh };
   }
 
-  function resultSvg() {
-    const f = st.fault;
+  function faultName(f) {
     const where = f.kind === "conn" ? T("a waterlogged connector in base {n}, on the side towards {p}", { n: f.j, p: pointName(f.j + f.s) })
       : f.kind === "txr" ? T("a failed isolating transformer in base {n}", { n: f.j })
-        : T("damaged cable between {a} and {b}", { a: pointName(f.k), b: pointName(f.k + 1) });
+        : f.cut ? T("a dead short: cable cut through between {a} and {b}", { a: pointName(f.k), b: pointName(f.k + 1) })
+          : T("damaged cable between {a} and {b}", { a: pointName(f.k), b: pointName(f.k + 1) });
+    return where + (f.hv ? " " + T("(a dry crack that only broke down at 2500 V and above)") : "");
+  }
+
+  function resultSvg() {
     let s = `<text class="fg-stars" x="30" y="352">${"★".repeat(st.stars)}${"☆".repeat(3 - st.stars)}</text>
       <text class="ins-title" x="30" y="390">${esc(T("Fault cleared in {h} h {m} min", { h: Math.floor(st.minutes / 60), m: Math.round(st.minutes % 60) }))}</text>`;
-    let y = 420;
-    const add = (text, cls) => { const w = wrap(text, 30, y, 62, cls, 22); s += w.svg; y += w.h + 8; };
-    add(T("The short was {where}.", { where }) + (f.hv ? " " + T("It was a dry crack that only broke down at 2500 V and above.") : ""), "lab");
-    add(T("Par for this circuit, splitting it in half each time, is about {p} min.", { p: st.par }), "lab small");
-    add(T("{t} tests, {w} wrong repairs.", { t: st.tests, w: st.wrong }), "lab small");
-    if (st.warnings) add(T("Safety: {n} unsafe action(s). On a real airfield that could be fatal.", { n: st.warnings }), "lab warnt");
-    return s + chip(30, Math.min(y + 6, 650), 160, T("Play again"), "new", "", "primary");
+    let y = 418;
+    const add = (text, cls, max, lh) => { const w = wrap(text, 30, y, max || 62, cls, lh || 22); s += w.svg; y += w.h + 6; };
+    if (st.faults.length === 1) add(T("The short was {where}.", { where: faultName(st.faults[0]) }), "lab");
+    else {
+      add(T("There were {n} faults:", { n: st.faults.length }), "lab");
+      st.faults.forEach((f, i) => add(`${i + 1}. ${faultName(f)}`, "lab small", 70, 18));
+    }
+    add(T("Par for this circuit, splitting it in half each time, is about {p} min.", { p: st.par }) + " " +
+      T("{t} tests, {w} wrong repairs.", { t: st.tests, w: st.wrong }), "lab small", 70, 18);
+    if (st.warnings) add(T("Safety: {n} unsafe action(s). On a real airfield that could be fatal.", { n: st.warnings }), "lab warnt", 62, 20);
+    return s + chip(30, Math.min(y + 2, 656), 160, T("Play again"), "new", "", "primary");
   }
 
   /* ---------- Drawing: the insulation tester ---------- */
@@ -708,7 +743,7 @@
 
   function render() {
     const host = document.getElementById("fg");
-    if (!host || !st.fault || !svg) return;
+    if (!host || !st.faults || !svg) return;
     const key = document.activeElement && svg.contains(document.activeElement) ? document.activeElement.dataset.key : null;
     group("map").innerHTML = mapSvg();
     group("inset").innerHTML = `<rect class="ins-bg" x="10" y="298" width="564" height="392" rx="10"/>` +
@@ -736,6 +771,7 @@
       ? st.log.map(l => `<li><span class="pill ${pill[l.kind][0]}">${esc(pill[l.kind][1])}</span> <span>${esc(l.text)}</span></li>`).join("")
       : `<li class="muted">${esc(T("No measurements yet."))}</li>`;
     host.querySelectorAll("#fg-level button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.level === st.level)));
+    host.querySelectorAll("#fg-diff button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.diff === st.diff)));
   }
 
   /* ---------- Input ---------- */
@@ -816,6 +852,12 @@
       const b = e.target.closest("button");
       if (!b) return;
       st.level = b.dataset.level;
+      newGame();
+    });
+    host.querySelector("#fg-diff").addEventListener("click", e => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      st.diff = b.dataset.diff;
       newGame();
     });
     host.querySelector("#fg-new").addEventListener("click", newGame);

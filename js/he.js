@@ -227,6 +227,13 @@ AGL.HE.STR = {
   "3D tour": "סיור בתלת־ממד",
 
   // Fault-finding game
+  "Work order: this old runway edge circuit has an earth fault alarm and has not been tested for years. Expect more than one weak spot.": "הוראת עבודה: מעגל שולי המסלול הישן הזה מתריע על קצר לאדמה ולא נבדק שנים. צפו ליותר מנקודה חלשה אחת.",
+  "Whole loop proved healthy from the vault. All {n} faults cleared.": "כל הלולאה נמצאה תקינה ממרכז החשמל. כל {n} התקלות תוקנו.",
+  "You cut out a connector with a hairline crack through its boot and fitted a new one.": "חתכתם מחבר עם סדק שיערה בשרוול והרכבתם מחבר חדש.",
+  "You found the cable sliced through where an earth rod was driven into the duct, and spliced in a new length.": "מצאתם את הכבל חתוך במקום שבו הוחדר מוט הארקה לתוך הצינור, והשחלתם קטע חדש עם מופות.",
+  "a dead short: cable cut through between {a} and {b}": "קצר מלא: כבל חתוך בין {a} ל{b}",
+  "(a dry crack that only broke down at 2500 V and above)": "(סדק יבש שנפרץ רק ב־2500 V ומעלה)",
+  "There were {n} faults:": "היו {n} תקלות:",
   "Safety incident": "אירוע בטיחות",
   "Click to dismiss": "לחצו לסגירה",
   "Base open.": "הבסיס פתוח.",
@@ -346,7 +353,6 @@ AGL.HE.STR = {
   "damaged cable between {a} and {b}": "כבל פגוע בין {a} ל{b}",
   "Fault cleared in {h} h {m} min": "התקלה תוקנה תוך {h} ש׳ ו־{m} דק׳",
   "The short was {where}.": "הקצר היה {where}.",
-  "It was a dry crack that only broke down at 2500 V and above.": "זה היה סדק יבש שנפרץ רק ב־2500 V ומעלה.",
   "Par for this circuit, splitting it in half each time, is about {p} min.": "הזמן המיטבי למעגל הזה, בחצייה לשניים בכל פעם, הוא כ־{p} דק׳.",
   "{t} tests, {w} wrong repairs.": "{t} בדיקות, {w} תיקונים שגויים.",
   "Safety: {n} unsafe action(s). On a real airfield that could be fatal.": "בטיחות: {n} פעולות לא בטוחות. בשדה תעופה אמיתי זה עלול להיות קטלני.",
