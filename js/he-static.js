@@ -398,5 +398,5 @@ AGL.HE.STATIC = [
   ["24 bases", "24 בסיסים"],
   ["40 bases", "40 בסיסים"],
   ["New fault", "תקלה חדשה"],
-  ["Measurements", "מדידות"]
+  ["Event log", "יומן אירועים"]
 ];

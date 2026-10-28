@@ -1197,3 +1197,9 @@ label.field.inline select { min-width: 180px; }
   .fl-row.two .fl-branch { margin-inline-start: 34px; }
 }
 .fl-key .fl-fix.mini { flex: none; }
+
+/* Event log and newly fitted parts */
+.fg-log .fg-at { flex: none; min-width: 3.2em; font-family: var(--f-mono, monospace); color: var(--muted); font-variant-numeric: tabular-nums; }
+.fg .conn.fresh { fill: #20262b; stroke: #e6edf2; stroke-width: 1.5; }
+.fg .txr.fresh { fill: #2f3942; stroke: #e6edf2; }
+.fg .can-in ~ .lab.newtag { fill: #136b37; font-weight: 700; letter-spacing: 0.06em; }
