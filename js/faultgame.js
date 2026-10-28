@@ -1,259 +1,704 @@
-/* Module J: "Find the short", a fault-location game on a runway edge circuit.
-   The loop leaves the vault (point 0), passes bases 1..N and returns to the vault (point N+1).
-   The hidden fault sits at a point p on that line: just inside base j (j - 0.25, a wet or damaged
-   connector) or halfway along a cable span (k + 0.5). Opening a pit splits the loop there, and a
-   megger test reads low only on the section that contains p. */
+/* Module J: "Find the short". A runway edge circuit has a short to earth somewhere on its loop.
+   Everything happens on one drawing: the circuit map on top, a close-up of where you stand
+   (the vault or a light base) and an insulation tester whose leads you clip on yourself.
+   Loop positions: the vault OUT terminal is 0, base j sits at j, the vault RET terminal is N+1.
+   Unplugging the primary connector on side s of base j (s = -1 towards base j-1, +1 towards j+1)
+   splits the loop at j + 0.25s. The hidden fault sits at p: in a cable span (k + 0.5), in a
+   cable-side connector (j + 0.3s) or in the isolating transformer (j). */
 (function () {
   const LEVELS = { easy: 12, normal: 24, hard: 40 };
-  const COST = { isolate: 10, open: 15, close: 10, test: 5, inspect: 5, fixConn: 30, dig: 120, final: 5 };
+  const VOLTS = [250, 500, 1000, 2500, 5000];
+  const COST = { isolate: 10, cutout: 2, lid: 10, lidClose: 5, unplug: 2, replug: 3, clip: 1, conn: 30, txr: 45, span: 120 };
+  const SPEED = 4;      // test seconds per real second
+  const LOW = 50;       // MΩ: a settled reading below this marks the section faulty on the map
+  const MAXR = 1e5;     // MΩ: the tester reads up to 100 GΩ
+  const JACK = { red: [614, 612], black: [614, 660] };
+  const PARK = { red: [572, 612], black: [572, 660] };
   const esc = s => String(s).replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
   const T = (s, v) => AGL.t(s, v);
+  const iso = s => "⁦" + s + "⁩";   // keeps numbers and units in order inside Hebrew text
+  const rnd = n => Math.floor(Math.random() * n);
+  const mmss = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+  const mx = (s, x) => (s < 0 ? x : 580 - x);   // mirror close-up geometry for the +1 side
 
-  const st = { level: "normal" };
+  const st = { level: "normal", volt: 1000 };
+  let svg = null, raf = 0;
 
   function newGame() {
+    cancelAnimationFrame(raf);
     const N = LEVELS[st.level];
+    const r = Math.random();
     let fault;
-    if (Math.random() < 0.75) {
-      const j = 1 + Math.floor(Math.random() * N);
-      fault = { kind: "conn", base: j, p: j - 0.25 };
-    } else {
-      const k = Math.floor(Math.random() * (N + 1));       // span k..k+1, where 0 and N+1 are the vault
-      fault = { kind: "span", a: k, b: k + 1, p: k + 0.5 };
-    }
-    Object.assign(st, { N, fault, isolated: false, open: new Set(), minutes: 0, tests: 0, opened: 0, warnings: 0, wrong: 0,
-      log: [], sel: "vault", done: false, msg: null, measured: [] });
+    if (r < 0.45) { const j = 1 + rnd(N), s = Math.random() < 0.5 ? -1 : 1; fault = { kind: "conn", j, s, p: j + 0.3 * s, r0: 0.3 + Math.random() * 2.5 }; }
+    else if (r < 0.65) { const j = 1 + rnd(N); fault = { kind: "txr", j, p: j, r0: 1 + Math.random() * 6 }; }
+    else { const k = rnd(N + 1); fault = { kind: "span", k, p: k + 0.5, r0: 0.05 + Math.random() * 0.4 }; }
+    // Some faults are dry cracks that only break down at a high test voltage
+    fault.hv = st.level !== "easy" && fault.kind !== "txr" && Math.random() < 0.3;
+    const wet = new Set();
+    for (let j = 1; j <= N; j++) if (Math.random() < 0.15) wet.add(j);
+    if (fault.kind !== "span" && Math.random() < 0.7) wet.add(fault.j);
+    Object.assign(st, {
+      N, fault, wet, k: 0.8 + Math.random() * 0.5, isolated: false, cutout: false, lids: new Set(), unplugged: new Set(),
+      loc: 0, clips: { red: null, black: null }, armed: null, drag: null, testing: false, t: 0, curve: [], reading: Infinity,
+      vOut: 0, dis: 0, vDis: 0, result: null, minutes: 0, warnings: 0, wrong: 0, tests: 0, opened: 0, log: [], measured: [],
+      fixed: false, done: false
+    });
+    say("info", () => (fault.hv ? T("Work order: the CCR on this runway edge circuit trips on earth fault, but only at the high brightness steps.")
+      : T("Work order: the CCR on this runway edge circuit shows an earth fault alarm.")) + " " + T("Start in the vault: switch the CCR off and lock it out."));
     render();
   }
 
-  // Section of the loop seen from point s looking in direction d (-1 towards the vault-out end, +1 onwards)
-  function section(s, d) {
-    const open = [...st.open].sort((a, b) => a - b);
-    if (d < 0) return [Math.max(0, ...open.filter(x => x < s)), s];
-    return [s, Math.min(st.N + 1, ...open.filter(x => x > s))];
-  }
-  const holds = ([a, b]) => st.fault.p > a && st.fault.p < b;
-  const pointName = x => (x === 0 || x === st.N + 1 ? T("the vault") : T("base {n}", { n: x }));
+  // Text may be a function so the message follows a language switch
+  function say(kind, text) { st.msg = { kind, text }; }
+  function warn(text) { st.warnings++; say("bad", text); }
 
-  function megger(sec, from) {
-    st.minutes += COST.test;
+  /* ---------- Circuit model ---------- */
+  function splits() {
+    return [...st.unplugged].map(key => { const [j, s] = key.split(":").map(Number); return j + 0.25 * s; });
+  }
+  // The piece of loop a terminal at x connects to, looking in direction d
+  function segment(x, d) {
+    const sp = splits();
+    if (d > 0) return [x, Math.min(st.N + 1, ...sp.filter(v => v > x + 1e-9))];
+    return [Math.max(0, ...sp.filter(v => v < x - 1e-9)), x];
+  }
+  const pointName = x => (x <= 0 || x >= st.N + 1 ? T("the vault") : T("base {n}", { n: x }));
+  const placeName = j => (j === 0 ? T("Vault") : T("Base {n}", { n: j }));
+
+  function termInfo(id) {
+    if (!id) return null;
+    const p = id.split(":");
+    if (p[0] === "v") {
+      if (p[1] === "earth") return { earth: true, label: T("vault earth bar") };
+      return p[1] === "out" ? { seg: segment(0, 1), label: T("field OUT") } : { seg: segment(st.N + 1, -1), label: T("field RET") };
+    }
+    const j = +p[1];
+    if (p[2] === "earth") return { earth: true, label: T("base {n} earth", { n: j }) };
+    const s = +p[2], x = j + 0.25 * s;
+    return p[3] === "cable" ? { seg: segment(x, s), label: T("cable to {p}", { p: pointName(j + s) }) }
+      : { seg: segment(x, -s), label: T("transformer lead, {p} side", { p: pointName(j + s) }) };
+  }
+
+  // Terminals you can clip onto where you stand, with their positions on the drawing
+  function terms() {
+    const out = [];
+    if (st.loc === 0) {
+      out.push({ id: "v:earth", x: 495, y: 607 });
+      if (st.cutout) out.push({ id: "v:out", x: 300, y: 585 }, { id: "v:ret", x: 384, y: 585 });
+    } else if (st.lids.has(st.loc)) {
+      const j = st.loc;
+      out.push({ id: `b:${j}:earth`, x: 290, y: 650 });
+      [-1, 1].forEach(s => {
+        if (st.unplugged.has(j + ":" + s)) out.push({ id: `b:${j}:${s}:cable`, x: mx(s, 168), y: 560 }, { id: `b:${j}:${s}:txr`, x: mx(s, 217), y: 560 });
+      });
+    }
+    return out;
+  }
+  function checkClips() {
+    const ids = terms().map(x => x.id);
+    ["red", "black"].forEach(c => { if (st.clips[c] && !ids.includes(st.clips[c])) st.clips[c] = null; });
+  }
+
+  // Insulation resistance of a piece of loop, in MΩ, t seconds into a test
+  function rIns(seg, t) {
+    const len = Math.max(0.3, seg[1] - seg[0]);
+    // Healthy insulation: capacitive charging first, then dielectric absorption (PI about 2)
+    let r = st.k * 20000 / len * (1 - Math.exp(-t / 1.2)) * Math.pow(Math.max(t, 0.2) / 60, 0.55);
+    const f = st.fault;
+    if (!st.fixed && f.p > seg[0] && f.p < seg[1] && (!f.hv || st.volt >= 2500)) {
+      const rf = f.r0 * (1 + 0.03 * t / 60);   // a leakage path barely changes with time
+      r = r * rf / (r + rf);
+    }
+    return r;
+  }
+  function resistance(t) {
+    const a = termInfo(st.clips.red), b = termInfo(st.clips.black);
+    if (!a || !b) return Infinity;
+    if (a.earth && b.earth) return 0;
+    if (a.earth || b.earth) return rIns((a.earth ? b : a).seg, t);
+    if (a.seg[0] === b.seg[0] && a.seg[1] === b.seg[1]) return 0;   // both ends of one conductor: continuity
+    return rIns(a.seg, t) + rIns(b.seg, t);
+  }
+  // The tester's source cannot hold its voltage into a low resistance
+  function outVolts(r, t) {
+    const ramp = 1 - Math.exp(-t / 0.6);
+    return st.volt * ramp * (isFinite(r) ? r / (r + st.volt * 5e-4) : 1);
+  }
+
+  function fmtR(r) {
+    if (!isFinite(r) || r >= MAXR) return "> 100 GΩ";
+    if (r >= 1000) return (r / 1000).toFixed(r < 10000 ? 2 : 1) + " GΩ";
+    if (r >= 1) return r.toFixed(r < 10 ? 2 : r < 100 ? 1 : 0) + " MΩ";
+    if (r >= 0.001) return Math.round(r * 1000) + " kΩ";
+    return "0.00 MΩ";
+  }
+
+  /* ---------- Testing ---------- */
+  function startTest() {
+    st.testing = true;
+    st.t = 0;
+    st.curve = [];
+    st.result = null;
     st.tests++;
-    const low = holds(sec);
-    const value = low ? (0.02 + Math.random() * 0.4) : (400 + Math.random() * 1600);
-    // Isolated so the number and unit keep their order inside Hebrew text
-    const reading = "\u2066" + (low ? value.toFixed(2) : Math.round(value)) + " MΩ\u2069";
-    st.measured.push({ sec, low });
-    const whole = sec[0] === 0 && sec[1] === st.N + 1;
-    st.log.unshift({ low, text: whole ? T("From {from}: whole loop, {r}", { from, r: reading })
-      : T("From {from}: {a} to {b}, {r}", { from, a: pointName(sec[0]), b: pointName(sec[1]), r: reading }) });
-    st.msg = { kind: low ? "bad" : "ok", text: low ? T("Low insulation: the short is in this section.") : T("Insulation good: this section is clear.") };
+    const t0 = performance.now();
+    const tick = now => {
+      st.t = (now - t0) / 1000 * SPEED;
+      st.reading = resistance(st.t);
+      st.vOut = outVolts(st.reading, st.t);
+      const last = st.curve[st.curve.length - 1];
+      if (!last || st.t - last[0] >= 0.25) st.curve.push([st.t, st.reading]);
+      if (st.t >= 600) { stopTest(); return; }
+      renderLive();
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    say("info", T("Testing at {v}. Watch the reading and press TEST again when you have what you need.", { v: iso(st.volt + " V") }));
+    render();
   }
 
-  function needIsolation() {
-    if (st.isolated) return false;
-    st.warnings++;
-    st.msg = { kind: "bad", text: T("Stop: the circuit is live. Isolate and lock out the CCR at the vault first.") };
-    return true;
+  function stopTest() {
+    cancelAnimationFrame(raf);
+    st.testing = false;
+    const t = st.t, r = resistance(t);
+    st.minutes += 2 + t / 60;
+    const at = s => (st.curve.find(c => c[0] >= s) || [0, null])[1];
+    const r15 = t >= 15 ? at(15) : null, r60 = t >= 60 ? at(60) : null;
+    st.result = { r, t, r15, r60, pi: r15 && r60 && isFinite(r60) ? r60 / r15 : null };
+
+    const a = termInfo(st.clips.red), b = termInfo(st.clips.black);
+    let kind = "info", seg = null;
+    if (!a || !b) kind = "open";
+    else if (a.earth !== b.earth) {
+      seg = (a.earth ? b : a).seg;
+      kind = t < 3 ? "unsettled" : r < LOW ? "low" : "good";
+      if (kind !== "unsettled") st.measured.push({ seg, low: kind === "low" });
+    }
+    st.log.unshift({ kind, text: T("{where}, {v} for {t}. LINE on {red}, EARTH on {black}: {r}", {
+      where: placeName(st.loc), v: iso(st.volt + " V"), t: iso(mmss(t)),
+      red: a ? a.label : T("not connected"), black: b ? b.label : T("not connected"), r: iso(fmtR(r))
+    }) + (st.result.pi ? " · PI " + iso(st.result.pi.toFixed(1)) : "") });
+
+    const msgs = {
+      open: ["info", T("A lead is not connected, so the tester sees an open circuit.")],
+      unsettled: ["info", T("You stopped before the reading settled: the cable was still charging. Hold the test for longer.")],
+      low: ["bad", T("Low insulation: the short is on the conductor you tested.")],
+      good: ["ok", T("Insulation good: the conductor you tested is clear at this voltage.")],
+      info: ["info", a && b && a.earth && b.earth ? T("Both leads on earth: the tester reads a short, as it should.")
+        : r === 0 ? T("Both leads on the same conductor: you measured its continuity, not its insulation. Put one lead on earth.")
+          : T("Neither lead is on earth, so this reading is not an insulation test of one section.")]
+    };
+    say(...msgs[kind]);
+    if (kind === "good" && st.fixed) {
+      if (seg[0] === 0 && seg[1] === st.N + 1) finish();
+      else say("ok", T("This piece is clear. The loop is still split somewhere: plug every connector back in and test the whole loop from the vault."));
+    }
+
+    // Discharge the cable through the tester before anyone touches the leads
+    st.vDis = st.vOut;
+    st.dis = st.vDis > 5 ? 1 : 0;
+    if (st.dis) {
+      const d0 = performance.now();
+      const step = now => {
+        st.dis = Math.max(0, 1 - (now - d0) / 1800);
+        if (st.dis > 0) { renderLive(); raf = requestAnimationFrame(step); } else render();
+      };
+      raf = requestAnimationFrame(step);
+    }
+    render();
   }
 
   function finish() {
     st.done = true;
-    st.minutes += st.open.size * COST.close + COST.final;
+    st.clips = { red: null, black: null };
+    st.minutes += st.lids.size * COST.lidClose;
     const k = Math.ceil(Math.log2(st.N + 1));
-    const par = COST.isolate + k * (COST.open + 2 * COST.test + COST.close) + COST.inspect + COST.fixConn + COST.final;
-    st.par = par;
-    st.stars = st.warnings ? 1 : st.minutes <= par ? 3 : st.minutes <= par * 1.5 ? 2 : 1;
+    st.par = Math.round(COST.isolate + COST.cutout + 2 * COST.clip + 3 + k * 33 + COST[st.fault.kind] + 18);
+    st.stars = st.warnings ? 1 : st.minutes <= st.par ? 3 : st.minutes <= st.par * 1.5 ? 2 : 1;
+    say("ok", () => T("Whole loop proved healthy from the vault. Fault cleared."));
+  }
+
+  /* ---------- Actions ---------- */
+  function placeOf(j) {
+    if (j === 0) return [60, 150];
+    return layout().P[j];
+  }
+
+  function placeClip(c, id) {
+    if (st.clips[c] !== id) st.minutes += COST.clip;
+    st.clips[c] = id;
+    st.armed = null;
   }
 
   function act(a, arg) {
+    if (a === "new") { newGame(); return; }
     if (st.done) return;
-    st.msg = null;
-    const s = st.sel;
+    const touch = ["term", "plug", "cutout", "fix-conn", "fix-txr", "dig"].includes(a);
+    if (st.testing && a !== "test" && a !== "volt" && a !== "knob") {
+      if (touch) warn(T("Never touch the leads or connectors during a test: the cable is charged to the test voltage."));
+      else say("info", T("Stop the test first: press TEST again."));
+      render();
+      return;
+    }
+    if (st.dis > 0 && a !== "volt" && a !== "knob") {
+      if (touch) warn(T("Wait for the tester to discharge the cable before you touch the leads or connectors."));
+      else say("info", T("The tester is still discharging the cable."));
+      render();
+      return;
+    }
+    const j = st.loc;
+    const live = () => { if (st.isolated) return false; warn(T("Stop: the circuit is live. Switch off and lock out the CCR in the vault first.")); return true; };
     switch (a) {
-      case "isolate":
-        st.isolated = true;
-        st.minutes += COST.isolate;
-        st.msg = { kind: "ok", text: T("CCR off, input breaker locked, series cutout open, field side proved dead. You can work on the circuit.") };
-        break;
-      case "testOut":
-        if (needIsolation()) break;
-        megger(section(0, 1), T("the vault (outgoing leg)"));
-        break;
-      case "testRet":
-        if (needIsolation()) break;
-        megger(section(st.N + 1, -1), T("the vault (return leg)"));
-        break;
-      case "open":
-        if (needIsolation()) break;
-        st.open.add(s);
-        st.opened++;
-        st.minutes += COST.open;
-        st.msg = { kind: "info", text: T("Pit open and connectors separated. The loop is split at base {n}.", { n: s }) };
-        break;
-      case "close":
-        st.open.delete(s);
-        st.minutes += COST.close;
-        st.msg = { kind: "info", text: T("Connectors remade and sealed, pit closed.") };
-        break;
-      case "test":
-        if (needIsolation()) break;
-        megger(section(s, arg), T("base {n}", { n: s }));
-        break;
-      case "inspect": {
-        st.minutes += COST.inspect;
-        const here = st.fault.kind === "conn" && st.fault.base === s;
-        st.msg = here ? { kind: "bad", text: T("Water in the base and a split boot on a primary connector. This looks like the fault.") }
-          : { kind: "ok", text: T("Base dry, connectors and boots look sound.") };
+      case "go": {
+        if (arg === j) break;
+        const [x1, y1] = placeOf(j), [x2, y2] = placeOf(arg);
+        st.minutes += 3 + (Math.abs(x2 - x1) + Math.abs(y2 - y1)) / 40;
+        st.loc = arg;
+        st.clips = { red: null, black: null };
+        st.armed = null;
+        say("info", arg === 0 ? T("You are in the vault.") : st.lids.has(arg) ? T("You are at base {n}. The base is open.", { n: arg })
+          : T("You are at base {n}. Click the base plate to open it.", { n: arg }));
         break;
       }
-      case "fix":
-        st.minutes += COST.fixConn;
-        if (st.fault.kind === "conn" && st.fault.base === s) { finish(); st.msg = { kind: "ok", text: T("Connector replaced and sealed. The whole loop now meggers above 500 MΩ.") }; }
-        else { st.wrong++; st.msg = { kind: "bad", text: T("New connector fitted, but the insulation is still low. The short is somewhere else.") }; }
+      case "isolate":
+        if (st.isolated) { say("info", T("The CCR is already off and locked out. Keep your lock on it until the work is finished.")); break; }
+        st.isolated = true;
+        st.minutes += COST.isolate;
+        say("ok", T("CCR off, input breaker locked out and tagged. Now open the series cutout to reach the field cables."));
         break;
-      case "dig": {
-        st.minutes += COST.dig;
-        const [a2, b2] = arg < 0 ? [s - 1, s] : [s, s + 1];
-        if (st.fault.kind === "span" && st.fault.a === a2 && st.fault.b === b2) { finish(); st.msg = { kind: "ok", text: T("Damaged cable found and replaced. The whole loop now meggers above 500 MΩ.") }; }
-        else { st.wrong++; st.msg = { kind: "bad", text: T("Two hours of digging and the cable is undamaged. The short is somewhere else.") }; }
+      case "cutout":
+        if (!st.isolated) { warn(T("Stop: never pull the series cutout with the CCR on. Switch off and lock out first.")); break; }
+        st.cutout = !st.cutout;
+        st.minutes += COST.cutout;
+        checkClips();
+        say("info", st.cutout ? T("Cutout plug pulled: the field loop is disconnected from the CCR. Field OUT and RET are exposed for testing.")
+          : T("Cutout plug back in: the field loop is connected to the CCR again."));
+        break;
+      case "lid":
+        st.lids.add(j);
+        st.opened++;
+        st.minutes += COST.lid;
+        say("info", st.wet.has(j) ? T("Base open. There is water in the bottom of the can.") : T("Base open. The can is dry."));
+        break;
+      case "close":
+        if ([-1, 1].some(s => st.unplugged.has(j + ":" + s))) { say("info", T("Plug both connectors back in before you close the base.")); break; }
+        st.lids.delete(j);
+        st.minutes += COST.lidClose;
+        checkClips();
+        say("info", T("Base plate bolted back on."));
+        break;
+      case "plug": {
+        if (live()) break;
+        const key = j + ":" + arg;
+        if (st.unplugged.has(key)) { st.unplugged.delete(key); st.minutes += COST.replug; say("info", T("Connector plugged back in and sealed.")); }
+        else {
+          st.unplugged.add(key);
+          st.minutes += COST.unplug;
+          say("info", T("Connector unplugged: the loop is split here. Clip a lead onto either side.") +
+            (burnt(j, arg) ? " " + T("The cable-side boot is blackened with tracking marks.") : ""));
+        }
+        checkClips();
+        break;
+      }
+      case "fix-conn": case "fix-txr": case "dig": {
+        if (live()) break;
+        const f = st.fault;
+        const kind = a === "fix-conn" ? "conn" : a === "fix-txr" ? "txr" : "span";
+        st.minutes += COST[kind];
+        const hit = !st.fixed && f.kind === kind && (kind === "conn" ? f.j === j && f.s === arg : kind === "txr" ? f.j === j : f.k === Math.min(j, j + arg));
+        if (hit) {
+          st.fixed = true;
+          st.measured = [];
+          say("ok", ({ conn: T("You cut out a connector with a split, waterlogged boot and fitted a new one."),
+            txr: T("The old transformer had a burnt primary winding. New transformer fitted."),
+            span: T("You found the cable crushed under an old trench repair and spliced in a new length.") })[kind] + " " +
+            T("Plug everything back in and prove the whole loop from the vault."));
+        } else {
+          st.wrong++;
+          say("bad", kind === "span" ? T("Two hours of digging and the cable is undamaged. The short is somewhere else.")
+            : T("The new part went in, but nothing was wrong with the old one. The short is somewhere else."));
+        }
+        break;
+      }
+      case "volt":
+      case "knob":
+        if (st.testing) { say("info", T("The range switch is locked while a test runs.")); break; }
+        st.volt = a === "volt" ? arg : VOLTS[(VOLTS.indexOf(st.volt) + 1) % VOLTS.length];
+        say("info", T("Test voltage set to {v}.", { v: iso(st.volt + " V") }));
+        break;
+      case "test":
+        if (st.testing) stopTest(); else startTest();
+        return;
+      case "term": {
+        const c = st.armed || (!st.clips.red ? "red" : !st.clips.black ? "black" : "red");
+        placeClip(c, arg);
+        say("info", T("{lead} lead clipped on {where}.", { lead: c === "red" ? T("LINE") : T("EARTH"), where: termInfo(arg).label }));
         break;
       }
     }
     render();
   }
 
-  /* ---------- Drawing ---------- */
+  /* ---------- Drawing: circuit map ---------- */
   function layout() {
     const N = st.N, m = Math.ceil(N / 2);
-    const P = [[110, 190]];
+    const P = [[100, 135]];
     for (let i = 1; i <= N; i++) {
-      if (i <= m) P.push([150 + (i - 1) * (760 / Math.max(1, m - 1)), 100]);
-      else P.push([910 - (i - m - 1) * (760 / Math.max(1, N - m - 1)), 340]);
+      if (i <= m) P.push([150 + (i - 1) * (760 / (m - 1)), 60]);
+      else P.push([910 - (i - m - 1) * (760 / (N - m - 1)), 240]);
     }
-    P.push([110, 250]);
+    P.push([100, 165]);
     return { P, m };
   }
-
   function spanPath(k, P, m) {
     const a = P[k], b = P[k + 1];
-    if (k === 0) return `M${a[0]},${a[1]} H128 V${b[1]} H${b[0]}`;
+    if (k === 0 || k === st.N) return `M${a[0]},${a[1]} H122 V${b[1]} H${b[0]}`;
     if (k === m) return `M${a[0]},${a[1]} H955 V${b[1]} H${b[0]}`;
-    if (k === st.N) return `M${a[0]},${a[1]} H128 V${b[1]} H${b[0]}`;
     return `M${a[0]},${a[1]} L${b[0]},${b[1]}`;
   }
+  const btn = (act, arg, label) => ` data-act="${act}" data-arg="${arg}" data-key="${act}|${arg}" tabindex="0" role="button" aria-label="${esc(label)}"`;
 
-  function svg() {
-    const { P, m } = layout();
-    const N = st.N;
-    // Colour each span by the latest measurement that covered it
-    const spanState = new Array(N + 1).fill("");
-    st.measured.forEach(({ sec, low }) => { for (let k = Math.ceil(sec[0]); k < sec[1]; k++) spanState[k] = low ? "low" : "ok"; });
-    let s = `<svg viewBox="0 0 1000 440" class="fg" role="img" aria-label="${esc(T("Runway edge circuit with {n} light bases", { n: N }))}">`;
-    s += `<rect class="rwy" x="150" y="160" width="760" height="120" rx="4"/><path class="cl" d="M170,220 H890"/>`;
-    s += `<text class="lab" x="530" y="200" text-anchor="middle">${esc(T("Runway"))}</text>`;
+  function mapSvg() {
+    const { P, m } = layout(), N = st.N;
+    const spanState = new Array(N + 1).fill(""), baseState = new Array(N + 2).fill("");
+    st.measured.forEach(({ seg, low }) => {
+      for (let k = 0; k <= N; k++) if (k + 0.5 > seg[0] && k + 0.5 < seg[1]) spanState[k] = low ? "low" : "ok";
+      for (let j = 1; j <= N; j++) if (j > seg[0] && j < seg[1]) baseState[j] = low ? "low" : "ok";
+    });
+    let s = `<rect class="rwy" x="150" y="100" width="760" height="100" rx="4"/><path class="cl" d="M170,150 H890"/>
+      <text class="lab" x="530" y="140" text-anchor="middle">${esc(T("Runway"))}</text>`;
     for (let k = 0; k <= N; k++) s += `<path class="span ${spanState[k]}" d="${spanPath(k, P, m)}"/>`;
-    // Vault
-    s += `<g class="pick${st.sel === "vault" ? " on" : ""}" data-sel="vault" tabindex="0" role="button" aria-label="${esc(T("Vault"))}">
-      <rect class="vault" x="20" y="165" width="90" height="110" rx="4"/><text class="lab${AGL.lang === "he" ? " small" : ""}" x="65" y="215" text-anchor="middle">${esc(T("Vault"))}</text>
-      <text class="lab small" x="65" y="234" text-anchor="middle">CCR</text>${st.isolated ? `<rect class="lock" x="52" y="252" width="26" height="18" rx="3"/><path class="lockbow" d="M57,252 v-5 a8,8 0 0 1 16,0 v5"/>` : ""}</g>`;
+    const here = st.loc === 0;
+    s += `<g class="pick${here ? " on" : ""}"${btn("go", 0, T("Walk to the vault"))}>
+      <rect class="vault" x="20" y="105" width="80" height="90" rx="4"/>
+      <text class="lab${AGL.lang === "he" ? " small" : ""}" x="60" y="146" text-anchor="middle">${esc(T("Vault"))}</text>
+      <text class="lab small" x="60" y="162" text-anchor="middle">CCR</text>
+      ${st.isolated ? `<rect class="lock" x="49" y="177" width="22" height="14" rx="3"/><path class="lockbow" d="M54,177 v-3 a6,6 0 0 1 12,0 v3"/>` : ""}</g>`;
     for (let i = 1; i <= N; i++) {
-      const [x, y] = P[i], top = i <= m, open = st.open.has(i), on = st.sel === i;
-      const ly = top ? y + 30 : y - 30;
-      s += `<g class="pick${on ? " on" : ""}" data-sel="${i}" tabindex="0" role="button" aria-label="${esc(T("Base {n}", { n: i }))}${open ? ", " + esc(T("open")) : ""}">
-        <circle class="light" cx="${x}" cy="${ly}" r="5"/>
-        <rect class="pit${open ? " open" : ""}" x="${x - 12}" y="${y - 12}" width="24" height="24" rx="3"/>
-        ${open ? `<rect class="lid" x="${x + 14}" y="${y - 10}" width="9" height="20" rx="2"/><path class="gap" d="M${x - 5},${y - 6} L${x + 5},${y + 6} M${x + 5},${y - 6} L${x - 5},${y + 6}"/>` : ""}
-        <text class="num" x="${x}" y="${top ? y - 18 : y + 30}" text-anchor="middle">${i}</text></g>`;
+      const [x, y] = P[i], top = i <= m, open = st.lids.has(i), on = st.loc === i;
+      s += `<g class="pick${on ? " on" : ""}"${btn("go", i, T("Walk to base {n}", { n: i }) + (open ? ", " + T("open") : ""))}>
+        <rect class="hit" x="${x - 18}" y="${y - 30}" width="36" height="62"/>
+        <circle class="light" cx="${x}" cy="${top ? y + 28 : y - 28}" r="5"/>
+        <rect class="pit${open ? " open" : ""} ${baseState[i]}" x="${x - 11}" y="${y - 11}" width="22" height="22" rx="3"/>`;
+      [-1, 1].forEach(sd => {
+        if (st.unplugged.has(i + ":" + sd)) { const gx = x + (top ? sd : -sd) * 15; s += `<path class="gap" d="M${gx},${y - 9} V${y + 9}"/>`; }
+      });
+      s += `<text class="num" x="${x}" y="${top ? y - 17 : y + 28}" text-anchor="middle">${i}</text></g>`;
     }
+    const [hx, hy] = placeOf(st.loc);
+    const py = st.loc === 0 ? 100 : hy < 150 ? hy - 36 : hy + 36;
+    s += st.loc === 0 ? "" : `<path class="here" d="M${hx},${py + (hy < 150 ? 6 : -6)} l-7,${hy < 150 ? -10 : 10} h14 Z"/>`;
     if (st.done) {
       const f = st.fault;
-      const [x, y] = f.kind === "conn" ? P[f.base] : [(P[f.a][0] + P[f.b][0]) / 2, (P[f.a][1] + P[f.b][1]) / 2];
-      s += `<g class="fault"><circle cx="${x}" cy="${y}" r="18"/><path d="M${x + 3},${y - 12} L${x - 6},${y + 2} L${x},${y + 2} L${x - 3},${y + 12} L${x + 6},${y - 2} L${x},${y - 2} Z"/></g>`;
+      const [x, y] = f.kind === "span" ? [(P[f.k][0] + P[f.k + 1][0]) / 2, (P[f.k][1] + P[f.k + 1][1]) / 2] : P[f.j];
+      s += `<g class="fault"><circle cx="${x}" cy="${y}" r="17"/><path d="M${x + 3},${y - 11} L${x - 6},${y + 2} L${x},${y + 2} L${x - 3},${y + 11} L${x + 6},${y - 2} L${x},${y - 2} Z"/></g>`;
     }
-    s += `<text class="lab small" x="20" y="420">${esc(T("Outgoing leg: bases 1–{m} · return leg: bases {m1}–{n}", { m, m1: m + 1, n: N }))}</text>`;
-    return s + "</svg>";
+    s += `<text class="lab small" x="20" y="288">${esc(T("Outgoing leg: bases 1–{m} · return leg: bases {m1}–{n} · click a base to walk there", { m, m1: m + 1, n: N }))}</text>`;
+    return s;
   }
 
-  function actions() {
-    if (st.done) return "";
-    const b = (a, label, arg, cls) => `<button type="button" class="btn${cls ? " " + cls : ""}" data-act="${a}"${arg !== undefined ? ` data-arg="${arg}"` : ""}>${esc(label)}</button>`;
-    const s = st.sel;
-    if (s === "vault") {
-      return `<h4>${esc(T("Vault"))}</h4><div class="fg-acts">
-        ${st.isolated ? `<span class="pill on-ok">${esc(T("Isolated and locked out"))}</span>` : b("isolate", T("Isolate and lock out the CCR ({m} min)", { m: COST.isolate }), undefined, "primary")}
-        ${b("testOut", T("Megger the outgoing leg ({m} min)", { m: COST.test }))}
-        ${b("testRet", T("Megger the return leg ({m} min)", { m: COST.test }))}</div>`;
-    }
-    const prev = pointName(s - 1), next = pointName(s + 1);
-    if (!st.open.has(s)) {
-      return `<h4>${esc(T("Base {n}", { n: s }))}</h4><div class="fg-acts">${b("open", T("Open the pit and separate the connectors ({m} min)", { m: COST.open }), undefined, "primary")}</div>`;
-    }
-    return `<h4>${esc(T("Base {n}", { n: s }))} <span class="pill on-warn">${esc(T("open"))}</span></h4>
-      <div class="fg-acts">
-        ${b("test", T("Megger towards {p} ({m} min)", { p: prev, m: COST.test }), -1, "primary")}
-        ${b("test", T("Megger towards {p} ({m} min)", { p: next, m: COST.test }), 1, "primary")}
-        ${b("inspect", T("Inspect the base and connectors ({m} min)", { m: COST.inspect }))}
-        ${b("fix", T("Replace the connector here ({m} min)", { m: COST.fixConn }))}
-        ${b("dig", T("Dig up the cable to {p} ({m} min)", { p: prev, m: COST.dig }), -1)}
-        ${b("dig", T("Dig up the cable to {p} ({m} min)", { p: next, m: COST.dig }), 1)}
-        ${b("close", T("Remake the connectors and close the pit ({m} min)", { m: COST.close }))}
-      </div>`;
+  /* ---------- Drawing: close-up of where you stand ---------- */
+  function chip(x, y, w, label, act, arg, cls) {
+    return `<g class="chip${cls ? " " + cls : ""}"${btn(act, arg, label)}><rect x="${x}" y="${y}" width="${w}" height="26" rx="13"/>
+      <text x="${x + w / 2}" y="${y + 17.5}" text-anchor="middle">${esc(label)}</text></g>`;
   }
 
-  function result() {
-    if (!st.done) return "";
+  function vaultSvg() {
+    const live = !st.isolated;
+    let s = `<text class="ins-title" x="30" y="328">${esc(T("Vault: CCR and series cutout"))}</text>
+      <rect class="cab" x="40" y="345" width="170" height="320" rx="6"/>
+      <text class="lab" x="125" y="372" text-anchor="middle">CCR</text>
+      <rect class="ccr-disp" x="70" y="385" width="110" height="32" rx="4"/>
+      <text class="ccr-t" x="125" y="407" text-anchor="middle">${esc(live ? T("Step {n}", { n: 3 }) : T("OFF"))}</text>`;
+    if (live) s += `<circle class="alarm" cx="125" cy="438" r="8"/><text class="lab small" x="125" y="465" text-anchor="middle">${esc(T("Earth fault"))}</text>`;
+    s += `<g class="act-g"${btn("isolate", "", T("Input breaker: switch off and lock out"))}>
+      <rect class="brk" x="88" y="478" width="74" height="104" rx="6"/>
+      <rect class="brk-h${live ? " on" : ""}" x="113" y="${live ? 490 : 536}" width="24" height="34" rx="4"/>
+      <text class="lab small" x="125" y="602" text-anchor="middle">${esc(T("Input breaker"))}</text>
+      <text class="lab small ${live ? "hint" : "okt"}" x="125" y="624" text-anchor="middle">${esc(live ? T("Click to switch off") : T("Off, locked out"))}</text>
+      ${live ? `<text class="lab small hint" x="125" y="642" text-anchor="middle">${esc(T("and lock out"))}</text>`
+        : `<rect class="lock" x="146" y="548" width="22" height="16" rx="3"/><path class="lockbow" d="M151,548 v-4 a6,6 0 0 1 12,0 v4"/>`}</g>
+      <path class="wire" d="M210,560 H262 M210,578 H262"/>
+      <rect class="cab" x="262" y="345" width="160" height="320" rx="6"/>
+      <text class="lab" x="342" y="372" text-anchor="middle">${esc(T("Series cutout"))}</text>
+      <rect class="cut-base" x="280" y="440" width="124" height="170" rx="6"/>
+      <path class="wire" d="M300,610 V650 H540 M384,610 V640 H540"/>
+      <text class="lab small" x="540" y="672" text-anchor="end">${esc(T("to the field"))}</text>
+      <rect class="earthbar" x="440" y="600" width="110" height="14" rx="3"/>
+      <text class="lab small" x="495" y="592" text-anchor="middle">${esc(T("Earth bar"))}</text>`;
+    if (!st.cutout) {
+      s += `<g class="act-g"${btn("cutout", "", T("Pull the cutout plug"))}>
+        <rect class="cut-plug" x="290" y="452" width="104" height="120" rx="8"/><rect class="cut-handle" x="322" y="468" width="40" height="16" rx="8"/>
+        <text class="lab small" x="342" y="530" text-anchor="middle">S-1</text>
+        <text class="lab small hint" x="342" y="632" text-anchor="middle">${esc(T("Click to pull the plug"))}</text></g>`;
+    } else {
+      s += `<text class="lab small" x="300" y="562" text-anchor="middle">OUT</text><text class="lab small" x="384" y="562" text-anchor="middle">RET</text>
+        <g class="act-g"${btn("cutout", "", T("Put the cutout plug back"))}>
+        <rect class="cut-plug" x="440" y="350" width="104" height="70" rx="8"/><rect class="cut-handle" x="472" y="360" width="40" height="14" rx="7"/>
+        <text class="lab small" x="492" y="402" text-anchor="middle">S-1</text>
+        <text class="lab small hint" x="492" y="440" text-anchor="middle">${esc(T("Click to put it back"))}</text></g>`;
+    }
+    return s;
+  }
+
+  // A failed connector shows tracking marks once it is pulled apart
+  const burnt = (j, s) => !st.fixed && st.fault.kind === "conn" && st.fault.j === j && st.fault.s === s;
+
+  function canSvg(j) {
+    const open = st.lids.has(j);
+    let s = `<text class="ins-title" x="30" y="328">${esc(T("Base {n}", { n: j }))} · ${esc(T("L-867 base can"))}</text>`;
+    [-1, 1].forEach(sd => {
+      s += `<path class="cable" d="M${mx(sd, 22)},560 H${mx(sd, 150)}"/>
+        <text class="lab small" x="${mx(sd, 26)}" y="548" text-anchor="${sd < 0 ? "start" : "end"}">${esc(T("to {p}", { p: pointName(j + sd) }))}</text>`;
+    });
+    if (!open) {
+      let bolts = "";
+      for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; bolts += `<circle class="bolt" cx="${290 + 132 * Math.cos(a)}" cy="${515 + 132 * Math.sin(a)}" r="6"/>`; }
+      return s + `<g class="act-g"${btn("lid", "", T("Open the base"))}>
+        <circle class="plate" cx="290" cy="515" r="150"/>${bolts}
+        <circle class="fixture" cx="290" cy="490" r="32"/><circle class="lens" cx="290" cy="490" r="17"/>
+        <text class="lab" x="290" y="565" text-anchor="middle">${esc(T("Base plate bolted on"))}</text>
+        <text class="lab small hint" x="290" y="588" text-anchor="middle">${esc(T("Click to open it ({m} min)", { m: COST.lid }))}</text></g>`;
+    }
+    s += `<circle class="can-in" cx="290" cy="515" r="150"/>`;
+    if (st.wet.has(j)) s += `<ellipse class="water" cx="290" cy="622" rx="118" ry="28"/>`;
+    s += `<rect class="lug" x="278" y="642" width="24" height="14" rx="2"/>
+      <text class="lab small" x="270" y="653" text-anchor="end">${esc(T("can earth"))}</text>
+      <path class="wire" d="M275,420 V385 M305,420 V385"/><text class="lab small" x="290" y="378" text-anchor="middle">${esc(T("to the lamp"))}</text>
+      <rect class="txr" x="235" y="420" width="110" height="64" rx="8"/>
+      <text class="lab" x="290" y="447" text-anchor="middle">L-830</text>
+      <text class="lab small" x="290" y="469" text-anchor="middle">${esc(T("transformer"))}</text>`;
+    s += chip(230, 492, 120, T("Replace ({m} min)", { m: COST.txr }), "fix-txr", "");
+    [-1, 1].forEach(sd => {
+      const un = st.unplugged.has(j + ":" + sd);
+      const rect = (a, b, cls) => { const x1 = mx(sd, a), x2 = mx(sd, b); return `<rect class="${cls}" x="${Math.min(x1, x2)}" y="551" width="${Math.abs(x2 - x1)}" height="18" rx="5"/>`; };
+      s += `<path class="lead-w" d="M${mx(sd, 235)},466 C${mx(sd, 205)},466 ${mx(sd, 255)},560 ${mx(sd, un ? 235 : 222)},560"/>
+        <g class="act-g plug"${btn("plug", sd, un ? T("Plug the connector back in") : T("Unplug the connector"))}>
+        ${rect(145, 242, "hit")}${un ? rect(150, 168, "conn c" + (burnt(j, sd) ? " burnt" : "")) + rect(217, 235, "conn t") : rect(150, 186, "conn c") + rect(186, 222, "conn t")}</g>`;
+      if (un) s += `<text class="lab tiny" x="${mx(sd, 166)}" y="541" text-anchor="middle">${esc(T("cable"))}</text>
+        <text class="lab tiny" x="${mx(sd, 221)}" y="541" text-anchor="middle">${esc(T("txr"))}</text>`;
+      s += `<text class="lab tiny hint" x="${mx(sd, 194)}" y="588" text-anchor="middle">${esc(un ? T("click to plug in") : T("click to unplug"))}</text>`;
+      s += chip(sd < 0 ? 140 : 320, 596, 120, T("Replace ({m} min)", { m: COST.conn }), "fix-conn", sd);
+      s += chip(sd < 0 ? 20 : 446, 572, 114, T("Dig up ({h} h)", { h: COST.span / 60 }), "dig", sd);
+    });
+    s += chip(430, 310, 130, T("Close the base"), "close", "");
+    return s;
+  }
+
+  function wrap(text, x, y, max, cls, lh) {
+    const words = text.split(" "), lines = [];
+    let line = "";
+    words.forEach(w => { if ((line + " " + w).trim().length > max) { lines.push(line.trim()); line = w; } else line += " " + w; });
+    if (line.trim()) lines.push(line.trim());
+    return { svg: lines.map((l, i) => `<text class="${cls}" x="${x}" y="${y + i * lh}">${esc(l)}</text>`).join(""), h: lines.length * lh };
+  }
+
+  function resultSvg() {
     const f = st.fault;
-    const where = f.kind === "conn" ? T("a wet, damaged connector in base {n}", { n: f.base }) : T("damaged cable between {a} and {b}", { a: pointName(f.a), b: pointName(f.b) });
-    const stars = "★".repeat(st.stars) + "☆".repeat(3 - st.stars);
-    return `<div class="fg-result">
-      <span class="fg-stars" aria-label="${esc(T("{n} of 3 stars", { n: st.stars }))}">${stars}</span>
-      <h4>${esc(T("Fault cleared in {h} h {m} min", { h: Math.floor(st.minutes / 60), m: st.minutes % 60 }))}</h4>
-      <p>${esc(T("The short was {where}.", { where }))} ${esc(T("Par for this circuit, splitting it in half each time, is about {p} min.", { p: st.par }))}</p>
-      ${st.warnings ? `<p class="fg-warn">${esc(T("Safety: you tried to work on a live circuit {n} time(s). On a real airfield that could be fatal.", { n: st.warnings }))}</p>` : ""}
-      <button type="button" class="btn primary" data-new>${esc(T("Play again"))}</button></div>`;
+    const where = f.kind === "conn" ? T("a waterlogged connector in base {n}, on the side towards {p}", { n: f.j, p: pointName(f.j + f.s) })
+      : f.kind === "txr" ? T("a failed isolating transformer in base {n}", { n: f.j })
+        : T("damaged cable between {a} and {b}", { a: pointName(f.k), b: pointName(f.k + 1) });
+    let s = `<text class="fg-stars" x="30" y="352">${"★".repeat(st.stars)}${"☆".repeat(3 - st.stars)}</text>
+      <text class="ins-title" x="30" y="390">${esc(T("Fault cleared in {h} h {m} min", { h: Math.floor(st.minutes / 60), m: Math.round(st.minutes % 60) }))}</text>`;
+    let y = 420;
+    const add = (text, cls) => { const w = wrap(text, 30, y, 62, cls, 22); s += w.svg; y += w.h + 8; };
+    add(T("The short was {where}.", { where }) + (f.hv ? " " + T("It was a dry crack that only broke down at 2500 V and above.") : ""), "lab");
+    add(T("Par for this circuit, splitting it in half each time, is about {p} min.", { p: st.par }), "lab small");
+    add(T("{t} tests, {w} wrong repairs.", { t: st.tests, w: st.wrong }), "lab small");
+    if (st.warnings) add(T("Safety: {n} unsafe action(s). On a real airfield that could be fatal.", { n: st.warnings }), "lab warnt");
+    return s + chip(30, Math.min(y + 6, 650), 160, T("Play again"), "new", "", "primary");
+  }
+
+  /* ---------- Drawing: the insulation tester ---------- */
+  function instrSvg() {
+    const res = st.result, testing = st.testing, dis = st.dis > 0;
+    const status = testing ? T("Testing") : dis ? T("Discharging") : res ? T("Last reading") : T("Ready");
+    const big = testing ? fmtR(st.reading) : res ? fmtR(res.r) : "– – –";
+    const sub = testing ? `${iso(st.volt + " V")} · ${T("output")} ${iso(Math.round(st.vOut) + " V")} · ${iso(mmss(st.t))}`
+      : dis ? T("Discharging the cable: {v}", { v: iso(Math.round(st.vDis * st.dis) + " V") })
+        : res ? `${iso(st.volt + " V")} · ${iso(mmss(res.t))}` : `${iso(st.volt + " V")}`;
+    let s = `<text class="lcd-s${testing ? " live" : ""}" x="620" y="358">${esc(status)}</text>
+      <text class="lcd-big" x="960" y="410" text-anchor="end">${esc(big)}</text>
+      <text class="lcd-s" x="620" y="436">${esc(sub)}</text>`;
+    // Reading against time, on a log scale from 10 kΩ to 100 GΩ
+    const curve = testing || dis || res ? st.curve : [];
+    const tmax = Math.max(90, ...curve.map(c => c[0]));
+    const gx = t => 652 + t / tmax * 316, gy = r => 552 - (Math.log10(Math.min(MAXR, Math.max(0.01, isFinite(r) ? r : MAXR))) + 2) / 7 * 88;
+    [[1, "1 MΩ"], [100, "100 MΩ"], [1e4, "10 GΩ"]].forEach(([r, l]) => { s += `<path class="grid" d="M652,${gy(r)} H968"/><text class="gl" x="648" y="${gy(r) + 4}" text-anchor="end">${l}</text>`; });
+    [15, 60].forEach(t => { s += `<path class="grid t" d="M${gx(t)},462 V554"/><text class="gl" x="${gx(t) + 3}" y="472">${t} s</text>`; });
+    if (curve.length > 1) s += `<polyline class="curve" points="${curve.map(c => `${gx(c[0]).toFixed(1)},${gy(c[1]).toFixed(1)}`).join(" ")}"/>`;
+    const pi = res && !testing ? (res.pi ? `R15 ${iso(fmtR(res.r15))} · R60 ${iso(fmtR(res.r60))} · PI ${iso(res.pi.toFixed(1))}`
+      : T("Hold a test for 60 s to get the polarization index.")) : T("Drag the clips onto terminals, then press TEST.");
+    s += `<text class="lab tiny ink" x="610" y="580">${esc(pi)}</text>`;
+    return s;
+  }
+
+  // The tester's case and controls, redrawn only when their state changes so clicks land on them
+  function caseSvg() {
+    const testing = st.testing;
+    let s = `<rect class="ins-body" x="590" y="298" width="400" height="392" rx="18"/>
+      <text class="ins-name" x="610" y="325">${esc(T("Insulation tester"))}</text>
+      <rect class="lcd" x="606" y="336" width="368" height="112" rx="8"/>
+      <rect class="graph" x="606" y="456" width="368" height="104" rx="6"/>`;
+    const ang = v => (-90 + VOLTS.indexOf(v) * 45) * Math.PI / 180;
+    s += `<g class="act-g knob"${btn("knob", "", T("Test voltage {v}, click to change", { v: st.volt + " V" }))}><circle cx="750" cy="640" r="26"/>
+      <path class="knob-p" d="M750,640 L${750 + 22 * Math.sin(ang(st.volt))},${640 - 22 * Math.cos(ang(st.volt))}"/></g>`;
+    VOLTS.forEach(v => {
+      const a = ang(v), x = 750 + 46 * Math.sin(a), y = 640 - 46 * Math.cos(a) + 4;
+      s += `<g class="act-g vsel${v === st.volt ? " on" : ""}"${btn("volt", v, v + " V")}><circle class="hit" cx="${x}" cy="${y - 4}" r="13"/>
+        <text x="${x}" y="${y}" text-anchor="middle">${v >= 1000 ? v / 1000 + "k" : v}</text></g>`;
+    });
+    s += `<text class="lab tiny" x="750" y="684" text-anchor="middle">${esc(T("Test voltage"))}</text>
+      <g class="act-g testbtn${testing ? " on" : ""}"${btn("test", "", testing ? T("Stop the test") : T("Start the test"))}>
+      <circle cx="890" cy="636" r="30"/><text x="890" y="641" text-anchor="middle">${esc(testing ? T("STOP") : T("TEST"))}</text></g>
+      <text class="lab tiny" x="890" y="684" text-anchor="middle">${esc(T("press to start or stop"))}</text>
+      <circle class="jack red" cx="${JACK.red[0]}" cy="${JACK.red[1]}" r="9"/><circle class="jack black" cx="${JACK.black[0]}" cy="${JACK.black[1]}" r="9"/>
+      <text class="lab tiny" x="630" y="${JACK.red[1] + 4}">${esc(T("LINE"))}</text>
+      <text class="lab tiny" x="630" y="${JACK.black[1] + 4}">${esc(T("EARTH"))}</text>`;
+    return s;
+  }
+
+  function clipPos(c) {
+    if (st.drag && st.drag.c === c) return [st.drag.x, st.drag.y];
+    const t = st.clips[c] && terms().find(x => x.id === st.clips[c]);
+    if (!t) return PARK[c];
+    return c === "black" && st.clips.red === st.clips.black ? [t.x + 12, t.y + 12] : [t.x, t.y];
+  }
+
+  function leadsSvg() {
+    let s = "";
+    ["black", "red"].forEach(c => {
+      const [jx, jy] = JACK[c], [x, y] = clipPos(c);
+      const sag = Math.min(694, Math.max(jy, y) + 50);
+      s += `<path class="lead ${c}" d="M${jx},${jy} C${jx - 40},${sag} ${x + 30},${sag} ${x},${y}"/>`;
+    });
+    ["black", "red"].forEach(c => {
+      const [x, y] = clipPos(c);
+      const label = (c === "red" ? T("LINE") : T("EARTH")) + " " + T("clip") + (st.clips[c] ? ", " + termInfo(st.clips[c]).label : "");
+      s += `<g class="clip ${c}${st.armed === c ? " armed" : ""}" data-clip="${c}" data-key="clip|${c}" tabindex="0" role="button" aria-label="${esc(label)}" transform="translate(${x},${y})">
+        <circle class="clip-hit" r="20"/><path class="jaw" d="M-11,-3 L10,-10 L12,-5 L-6,0 Z M-11,3 L10,10 L12,5 L-6,0 Z"/><circle class="boot" cx="-10" r="7"/></g>`;
+    });
+    return s;
+  }
+
+  function termsSvg() {
+    return terms().map(t => `<g class="term${st.armed || st.drag ? " ready" : ""}"${btn("term", t.id, termInfo(t.id).label)} transform="translate(${t.x},${t.y})">
+      <circle class="term-hit" r="16"/><circle class="term-dot" r="6"/></g>`).join("");
+  }
+
+  /* ---------- Render ---------- */
+  const group = name => svg.querySelector(".g-" + name);
+
+  function renderLive() {
+    if (!svg) return;
+    group("lcd").innerHTML = instrSvg();
+    AGL.bidiSvg(group("lcd"));
   }
 
   function render() {
     const host = document.getElementById("fg");
-    if (!host || !st.fault) return;
-    host.querySelector(".fg-map").innerHTML = svg();
-    AGL.bidiSvg(host.querySelector(".fg-map"));
+    if (!host || !st.fault || !svg) return;
+    const key = document.activeElement && svg.contains(document.activeElement) ? document.activeElement.dataset.key : null;
+    group("map").innerHTML = mapSvg();
+    group("inset").innerHTML = `<rect class="ins-bg" x="10" y="298" width="564" height="392" rx="10"/>` +
+      (st.done ? resultSvg() : (st.loc === 0 ? vaultSvg() : canSvg(st.loc)) + termsSvg());
+    group("instr").innerHTML = caseSvg();
+    group("leads").innerHTML = leadsSvg();
+    renderLive();
+    AGL.bidiSvg(svg);
+    if (key) { const el = svg.querySelector(`[data-key="${CSS.escape(key)}"]`); if (el) el.focus({ preventScroll: true }); }
+    svg.setAttribute("aria-label", T("Runway edge circuit with {n} light bases", { n: st.N }));
+    const msg = host.querySelector(".fg-msg");
+    msg.className = "feedback fg-msg " + st.msg.kind;
+    msg.textContent = typeof st.msg.text === "function" ? st.msg.text() : st.msg.text;
     const pills = [
-      [T("Time"), `${Math.floor(st.minutes / 60)}:${String(st.minutes % 60).padStart(2, "0")}`],
-      [T("Pits opened"), st.opened],
+      [T("Time"), `${Math.floor(st.minutes / 60)}:${String(Math.floor(st.minutes % 60)).padStart(2, "0")}`],
+      [T("Bases opened"), st.opened],
       [T("Tests"), st.tests],
       [T("Wrong repairs"), st.wrong],
       [T("Safety warnings"), st.warnings]
     ];
     host.querySelector(".fg-stats").innerHTML = pills.map(([k, v], i) =>
       `<div class="readout${i === 4 && st.warnings ? " warn" : ""}"><span class="k">${esc(k)}</span><span class="v"><bdi dir="ltr">${esc(v)}</bdi></span></div>`).join("");
-    host.querySelector(".fg-panel").innerHTML = (st.msg ? `<div class="feedback fg-msg ${st.msg.kind}">${esc(st.msg.text)}</div>` : "") + result() + actions();
+    const pill = { low: ["on-bad", T("Low")], good: ["on-ok", T("Good")], unsettled: ["", T("Not settled")], open: ["", T("Open")], info: ["", T("Check")] };
     host.querySelector(".fg-log").innerHTML = st.log.length
-      ? st.log.map(l => `<li><span class="pill ${l.low ? "on-bad" : "on-ok"}">${esc(l.low ? T("Low") : T("Good"))}</span> ${esc(l.text)}</li>`).join("")
-      : `<li class="muted">${esc(T("No measurements yet. Start at the vault."))}</li>`;
+      ? st.log.map(l => `<li><span class="pill ${pill[l.kind][0]}">${esc(pill[l.kind][1])}</span> <span>${esc(l.text)}</span></li>`).join("")
+      : `<li class="muted">${esc(T("No measurements yet."))}</li>`;
     host.querySelectorAll("#fg-level button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.level === st.level)));
+  }
+
+  /* ---------- Input ---------- */
+  function toSvg(e) {
+    const p = svg.createSVGPoint();
+    p.x = e.clientX;
+    p.y = e.clientY;
+    return p.matrixTransform(svg.getScreenCTM().inverse());
+  }
+  const argOf = el => { const a = el.dataset.arg; return a === "" ? undefined : isNaN(+a) ? a : +a; };
+
+  function grabBlocked() {
+    if (st.done) return true;
+    if (st.testing) { warn(T("Never touch the leads or connectors during a test: the cable is charged to the test voltage.")); render(); return true; }
+    if (st.dis > 0) { warn(T("Wait for the tester to discharge the cable before you touch the leads or connectors.")); render(); return true; }
+    return false;
   }
 
   AGL.initFaultGame = function () {
     const host = document.getElementById("fg");
     if (!host) return;
-    const pick = sel => {
-      if (st.done) return;
-      st.sel = sel === "vault" ? "vault" : +sel;
-      st.msg = null;
+    host.querySelector(".fg-map").innerHTML = `<svg viewBox="0 0 1000 700" class="fg" role="group" style="aspect-ratio: 1000 / 700">
+      <g class="g-map"></g><g class="g-inset"></g><g class="g-instr"></g><g class="g-lcd"></g><g class="g-leads"></g></svg>`;
+    svg = host.querySelector("svg.fg");
+
+    svg.addEventListener("click", e => {
+      const el = e.target.closest("[data-act]");
+      if (el) act(el.dataset.act, argOf(el));
+    });
+    svg.addEventListener("keydown", e => {
+      const clip = e.target.closest(".clip");
+      if (clip && (e.key === "Delete" || e.key === "Backspace")) {
+        e.preventDefault();
+        if (!grabBlocked()) { st.clips[clip.dataset.clip] = null; st.armed = null; render(); }
+        return;
+      }
+      if (e.key !== "Enter" && e.key !== " ") return;
+      if (clip) { e.preventDefault(); if (!grabBlocked()) { st.armed = st.armed === clip.dataset.clip ? null : clip.dataset.clip; render(); } return; }
+      const el = e.target.closest("[data-act]");
+      if (el) { e.preventDefault(); act(el.dataset.act, argOf(el)); }
+    });
+    // Drag a clip onto a terminal, or tap it and then tap a terminal
+    svg.addEventListener("pointerdown", e => {
+      const clip = e.target.closest(".clip");
+      if (!clip || e.button > 0) return;
+      e.preventDefault();
+      if (grabBlocked()) return;
+      const p = toSvg(e);
+      st.drag = { c: clip.dataset.clip, x: p.x, y: p.y, x0: p.x, y0: p.y, moved: false };
+      svg.setPointerCapture(e.pointerId);
+    });
+    svg.addEventListener("pointermove", e => {
+      if (!st.drag) return;
+      const p = toSvg(e);
+      Object.assign(st.drag, { x: p.x, y: p.y });
+      if (Math.hypot(p.x - st.drag.x0, p.y - st.drag.y0) > 6) st.drag.moved = true;
+      if (st.drag.moved) group("leads").innerHTML = leadsSvg();
+    });
+    const drop = e => {
+      const d = st.drag;
+      if (!d) return;
+      st.drag = null;
+      if (svg.hasPointerCapture(e.pointerId)) svg.releasePointerCapture(e.pointerId);
+      if (!d.moved) { st.armed = st.armed === d.c ? null : d.c; render(); return; }
+      let best = null, bd = 40;
+      terms().forEach(t => { const dd = Math.hypot(t.x - d.x, t.y - d.y); if (dd < bd) { bd = dd; best = t; } });
+      if (best) {
+        placeClip(d.c, best.id);
+        say("info", T("{lead} lead clipped on {where}.", { lead: d.c === "red" ? T("LINE") : T("EARTH"), where: termInfo(best.id).label }));
+      } else st.clips[d.c] = null;
       render();
     };
-    host.querySelector(".fg-map").addEventListener("click", e => { const g = e.target.closest(".pick"); if (g) pick(g.dataset.sel); });
-    host.querySelector(".fg-map").addEventListener("keydown", e => {
-      const g = e.target.closest(".pick");
-      if (g && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); pick(g.dataset.sel); host.querySelector(`.pick[data-sel="${g.dataset.sel}"]`).focus(); }
-    });
-    host.querySelector(".fg-panel").addEventListener("click", e => {
-      const b = e.target.closest("button");
-      if (!b) return;
-      if (b.hasAttribute("data-new")) { newGame(); return; }
-      act(b.dataset.act, b.dataset.arg !== undefined ? +b.dataset.arg : undefined);
-    });
+    svg.addEventListener("pointerup", drop);
+    svg.addEventListener("pointercancel", drop);
+
     host.querySelector("#fg-level").addEventListener("click", e => {
       const b = e.target.closest("button");
       if (!b) return;

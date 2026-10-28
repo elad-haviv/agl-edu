@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Hebrew:wght@400;500;600&family=Heebo:wght@500;700;800&display=swap">
 <!-- Bump ?v= on every release so browsers and CDNs fetch the new CSS and JS -->
-<link rel="stylesheet" href="css/agl.css?v=20261029">
+<link rel="stylesheet" href="css/agl.css?v=20261030">
 </head>
 <body>
 
@@ -604,18 +604,18 @@
 
       <article class="lesson">
         <h3>Find the short</h3>
-        <p class="lede-small">A runway edge circuit has a short to earth somewhere along its loop. Isolate it, split it at the pits, megger each section and repair the fault in as few minutes as you can. Every action costs the time it would take on the airfield.</p>
+        <p class="lede-small">A runway edge circuit has a short to earth somewhere along its loop. Make it safe, clip the insulation tester on, split the loop at the light bases and test each piece until you find the short. Every action costs the time it would take on the airfield.</p>
         <details class="more">
           <summary>How to play</summary>
           <div class="prose">
             <ol>
-              <li>Select the vault and isolate the CCR. Nothing else is safe until you do.</li>
-              <li>Megger from the vault: a low reading confirms a short somewhere on the loop.</li>
-              <li>Select a base, open its pit and megger towards each side. Only the section containing the short reads low.</li>
-              <li>Keep splitting the low section in half. When it is down to one or two bases, inspect them, and the open pits at each end too: their connectors belong to the section.</li>
-              <li>Replace the faulty connector, or dig up the damaged cable span. A wrong repair costs time and the short stays.</li>
+              <li>In the vault, click the CCR input breaker to switch it off and lock it out, then pull the series cutout plug to expose the field OUT and RET terminals.</li>
+              <li>Drag the red LINE clip onto a conductor and the black EARTH clip onto earth. Pick a test voltage on the dial and press TEST. The reading climbs while the cable charges; press TEST again to stop when it has settled.</li>
+              <li>Click a base on the map to walk there, click the base plate to open it and click a connector to unplug it. The loop is now split: clip onto the cable side or the transformer side and test each one.</li>
+              <li>Only the piece that contains the short reads low. Keep splitting it until you know exactly which cable, connector or transformer has failed, then use its Replace or Dig up chip.</li>
+              <li>Plug everything back in and prove the whole loop from the vault to finish.</li>
             </ol>
-            <p>Tip: opening the pit in the middle of the low section halves the search every time, so even 40 bases need only about six splits.</p>
+            <p>Tip: hold a test for a full minute to get the polarization index. Healthy insulation keeps rising (PI about 2); a wet fault stays flat. Some faults are dry cracks that only show at 2500 V or more.</p>
           </div>
         </details>
         <div id="fg" class="fg-game">
@@ -631,11 +631,9 @@
           </div>
           <div class="readouts fg-stats"></div>
           <p class="scroll-hint">Swipe the diagram sideways to see all of it.</p>
+          <div class="feedback fg-msg info" aria-live="polite"></div>
           <div class="sld-wrap fg-map"></div>
-          <div class="fg-below">
-            <div class="panel fg-panel" aria-live="polite"></div>
-            <div class="panel"><h4>Measurements</h4><ol class="fg-log"></ol></div>
-          </div>
+          <div class="panel"><h4>Measurements</h4><ol class="fg-log"></ol></div>
         </div>
       </article>
 
@@ -742,20 +740,20 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="js/data.js?v=20261029"></script>
-<script src="js/detail-data.js?v=20261029"></script>
-<script src="js/vault-data.js?v=20261029"></script>
-<script src="js/he.js?v=20261029"></script>
-<script src="js/he-static.js?v=20261029"></script>
-<script src="js/i18n.js?v=20261029"></script>
-<script src="js/airfield.js?v=20261029"></script>
-<script src="js/circuit.js?v=20261029"></script>
-<script src="js/calc.js?v=20261029"></script>
-<script src="js/learn.js?v=20261029"></script>
-<script src="js/detail3d.js?v=20261029"></script>
-<script src="js/vault.js?v=20261029"></script>
-<script src="js/vault3d.js?v=20261029"></script>
-<script src="js/faultgame.js?v=20261029"></script>
-<script src="js/app.js?v=20261029"></script>
+<script src="js/data.js?v=20261030"></script>
+<script src="js/detail-data.js?v=20261030"></script>
+<script src="js/vault-data.js?v=20261030"></script>
+<script src="js/he.js?v=20261030"></script>
+<script src="js/he-static.js?v=20261030"></script>
+<script src="js/i18n.js?v=20261030"></script>
+<script src="js/airfield.js?v=20261030"></script>
+<script src="js/circuit.js?v=20261030"></script>
+<script src="js/calc.js?v=20261030"></script>
+<script src="js/learn.js?v=20261030"></script>
+<script src="js/detail3d.js?v=20261030"></script>
+<script src="js/vault.js?v=20261030"></script>
+<script src="js/vault3d.js?v=20261030"></script>
+<script src="js/faultgame.js?v=20261030"></script>
+<script src="js/app.js?v=20261030"></script>
 </body>
 </html>
