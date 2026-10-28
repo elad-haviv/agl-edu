@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Hebrew:wght@400;500;600&family=Heebo:wght@500;700;800&display=swap">
 <!-- Bump ?v= on every release so browsers and CDNs fetch the new CSS and JS -->
-<link rel="stylesheet" href="css/agl.css?v=20261106">
+<link rel="stylesheet" href="css/agl.css?v=20261107">
 </head>
 <body>
 
@@ -741,6 +741,8 @@
               <li>In the vault, the CCR shows its step, current and alarms. Clamp the meter on its output to read the true current: a CCR out of calibration still displays 6.6 A. A dark display means no control power: check the control fuse.</li>
               <li>To test the CCR itself, lock it out, pull the cutout plug (the CCR side is then shorted) and switch it on. A healthy CCR regulates into the short; one that still trips on open circuit has a faulty control board.</li>
               <li>At a light, change the lamp or the fitting from above. Open the base to unplug the secondary connector and measure each side on the continuity range: the lamp side reads about 1.4 Ω, the transformer secondary about 0.3 Ω. Far less means shorted turns.</li>
+              <li>A single short to earth leaves every light on and only raises the earth fault alarm, because the series loop floats. Two shorts to earth make a path through the ground: the lights between them go dark, while the rest stay on. Find both with the insulation tester.</li>
+              <li>Interleaved circuits may be fed from two vaults, one at each end of the runway. Where a vault has a standby CCR, lock out and use the changeover switch to put a circuit on the standby: the lighting comes back at once and the duty CCR can be repaired out of circuit.</li>
               <li>Lock out before any work and remake every joint and remove every jumper before you switch on again. The job is done when every light is on and every alarm is clear.</li>
             </ol>
           </div>
@@ -751,6 +753,7 @@
               <span class="seg fg-scen">
                 <button type="button" data-scen="fixtures" aria-pressed="true">Light fittings</button>
                 <button type="button" data-scen="ccr" aria-pressed="false">CCR</button>
+                <button type="button" data-scen="earth" aria-pressed="false">Earth faults</button>
                 <button type="button" data-scen="interleaved" aria-pressed="false">Interleaved circuits</button>
                 <button type="button" data-scen="mixed" aria-pressed="false">Mixed</button>
               </span>
@@ -887,21 +890,21 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="js/data.js?v=20261106"></script>
-<script src="js/detail-data.js?v=20261106"></script>
-<script src="js/vault-data.js?v=20261106"></script>
-<script src="js/he.js?v=20261106"></script>
-<script src="js/he-static.js?v=20261106"></script>
-<script src="js/i18n.js?v=20261106"></script>
-<script src="js/airfield.js?v=20261106"></script>
-<script src="js/circuit.js?v=20261106"></script>
-<script src="js/calc.js?v=20261106"></script>
-<script src="js/learn.js?v=20261106"></script>
-<script src="js/detail3d.js?v=20261106"></script>
-<script src="js/vault.js?v=20261106"></script>
-<script src="js/vault3d.js?v=20261106"></script>
-<script src="js/faultgame.js?v=20261106"></script>
-<script src="js/flows.js?v=20261106"></script>
-<script src="js/app.js?v=20261106"></script>
+<script src="js/data.js?v=20261107"></script>
+<script src="js/detail-data.js?v=20261107"></script>
+<script src="js/vault-data.js?v=20261107"></script>
+<script src="js/he.js?v=20261107"></script>
+<script src="js/he-static.js?v=20261107"></script>
+<script src="js/i18n.js?v=20261107"></script>
+<script src="js/airfield.js?v=20261107"></script>
+<script src="js/circuit.js?v=20261107"></script>
+<script src="js/calc.js?v=20261107"></script>
+<script src="js/learn.js?v=20261107"></script>
+<script src="js/detail3d.js?v=20261107"></script>
+<script src="js/vault.js?v=20261107"></script>
+<script src="js/vault3d.js?v=20261107"></script>
+<script src="js/faultgame.js?v=20261107"></script>
+<script src="js/flows.js?v=20261107"></script>
+<script src="js/app.js?v=20261107"></script>
 </body>
 </html>
