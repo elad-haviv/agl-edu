@@ -46,8 +46,10 @@
       N, fault, wet, wear, k: 0.8 + Math.random() * 0.5, isolated: false, cutout: false, lids: new Set(), unplugged: new Set(),
       loc: 0, clips: { red: null, black: null }, armed: null, drag: null, testing: false, t: 0, curve: [], reading: Infinity,
       vOut: 0, dis: 0, vDis: 0, result: null, minutes: 0, warnings: 0, wrong: 0, tests: 0, opened: 0, log: [], measured: [],
-      fixed: false, done: false
+      fixed: false, done: false, alert: null
     });
+    clearTimeout(alertTimer);
+    renderAlert();
     say("info", () => (fault.hv ? T("Work order: the CCR on this runway edge circuit trips on earth fault, but only at the high brightness steps.")
       : T("Work order: the CCR on this runway edge circuit shows an earth fault alarm.")) + " " + T("Start in the vault: switch the CCR off and lock it out."));
     render();
@@ -55,7 +57,16 @@
 
   // Text may be a function so the message follows a language switch
   function say(kind, text) { st.msg = { kind, text }; }
-  function warn(text) { st.warnings++; say("bad", text); }
+  // A safety incident: counted, explained, and flashed on the drawing where it happened
+  let alertTimer = 0;
+  function warn(text, at) {
+    st.warnings++;
+    say("bad", text);
+    st.alert = { text, at: at || [500, 400] };
+    renderAlert();
+    clearTimeout(alertTimer);
+    alertTimer = setTimeout(() => { st.alert = null; renderAlert(); }, 4500);
+  }
 
   /* ---------- Circuit model ---------- */
   function splits() {
@@ -239,19 +250,19 @@
     if (st.done) return;
     const touch = ["term", "plug", "cutout", "fix-conn", "fix-txr", "dig"].includes(a);
     if (st.testing && a !== "test" && a !== "volt" && a !== "knob") {
-      if (touch) warn(T("Never touch the leads or connectors during a test: the cable is charged to the test voltage."));
+      if (touch) warn(T("Never touch the leads or connectors during a test: the cable is charged to the test voltage."), spot(a, arg));
       else say("info", T("Stop the test first: press TEST again."));
       render();
       return;
     }
     if (st.dis > 0 && a !== "volt" && a !== "knob") {
-      if (touch) warn(T("Wait for the tester to discharge the cable before you touch the leads or connectors."));
+      if (touch) warn(T("Wait for the tester to discharge the cable before you touch the leads or connectors."), spot(a, arg));
       else say("info", T("The tester is still discharging the cable."));
       render();
       return;
     }
     const j = st.loc;
-    const live = () => { if (st.isolated) return false; warn(T("Stop: the circuit is live. Switch off and lock out the CCR in the vault first.")); return true; };
+    const live = () => { if (st.isolated) return false; warn(T("Stop: the circuit is live. Switch off and lock out the CCR in the vault first."), spot(a, arg)); return true; };
     switch (a) {
       case "go": {
         if (arg === j) break;
@@ -271,7 +282,7 @@
         say("ok", T("CCR off, input breaker locked out and tagged. Now open the series cutout to reach the field cables."));
         break;
       case "cutout":
-        if (!st.isolated) { warn(T("Stop: never pull the series cutout with the CCR on. Switch off and lock out first.")); break; }
+        if (!st.isolated) { warn(T("Stop: never pull the series cutout with the CCR on. Switch off and lock out first."), spot(a, arg)); break; }
         st.cutout = !st.cutout;
         st.minutes += COST.cutout;
         checkClips();
@@ -638,6 +649,54 @@
       <circle class="term-hit" r="16"/><circle class="term-dot" r="6"/></g>`).join("");
   }
 
+  // Where on the drawing an action takes place
+  function spot(a, arg) {
+    if (a === "term") { const t = terms().find(x => x.id === arg); if (t) return [t.x, t.y]; }
+    if (a === "plug") return [mx(arg, 186), 560];
+    if (a === "fix-conn") return [mx(arg, 168), 560];
+    if (a === "fix-txr") return [290, 452];
+    if (a === "dig") return [mx(arg, 70), 560];
+    if (a === "cutout") return [342, 512];
+    return [290, 500];
+  }
+
+  function alertSvg() {
+    const a = st.alert;
+    if (!a) return "";
+    const [x, y] = a.at;
+    const w = wrap(a.text, 0, 0, 52, "al-text", 21);
+    const h = 74 + w.h, bx = 260, by = y > 430 ? 236 : 460;
+    let rays = "";
+    for (let i = 0; i < 10; i++) {
+      const t = i * Math.PI / 5, r1 = 14, r2 = i % 2 ? 30 : 44;
+      rays += `M${(x + r1 * Math.cos(t)).toFixed(1)},${(y + r1 * Math.sin(t)).toFixed(1)} L${(x + r2 * Math.cos(t + 0.15)).toFixed(1)},${(y + r2 * Math.sin(t + 0.15)).toFixed(1)} `;
+    }
+    return `<defs><pattern id="fg-hazard" width="20" height="20" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width="20" height="20" fill="#ffcc00"/><rect width="10" height="20" fill="#111417"/></pattern></defs>
+      <rect class="al-flash" x="0" y="0" width="1000" height="700"/>
+      <g class="al-spark" style="transform-origin: ${x}px ${y}px">
+        <circle class="al-ring" cx="${x}" cy="${y}" r="24"/><path class="al-rays" d="${rays}"/>
+        <path class="al-bolt" d="M${x + 4},${y - 16} L${x - 8},${y + 2} L${x},${y + 2} L${x - 4},${y + 16} L${x + 9},${y - 3} L${x + 1},${y - 3} Z"/></g>
+      <g class="al-card" data-dismiss="1" role="alert" aria-label="${esc(T("Safety incident") + ": " + a.text)}">
+        <rect class="al-border" x="${bx}" y="${by}" width="480" height="${h}" rx="10"/>
+        <rect class="al-body" x="${bx + 8}" y="${by + 8}" width="464" height="${h - 16}" rx="6"/>
+        <path class="al-tri" d="M${bx + 40},${by + 18} l17,30 h-34 Z"/><text class="al-excl" x="${bx + 40}" y="${by + 44}" text-anchor="middle">!</text>
+        <text class="al-title" x="${bx + 68}" y="${by + 42}">${esc(T("Safety incident"))}</text>
+        <g transform="translate(${bx + 24},${by + 72})">${w.svg}</g>
+        <text class="al-hint" x="${bx + 456}" y="${by + 42}" text-anchor="end">${esc(T("Click to dismiss"))}</text></g>`;
+  }
+
+  function renderAlert() {
+    if (!svg) return;
+    const g = group("alert");
+    g.innerHTML = alertSvg();
+    AGL.bidiSvg(g);
+    const map = svg.closest(".fg-map"), host = document.getElementById("fg");
+    if (st.alert) {
+      [map, host.querySelector(".fg-stats")].forEach(el => { el.classList.remove("fg-shake"); void el.getBoundingClientRect(); el.classList.add("fg-shake"); });
+    }
+  }
+
   /* ---------- Render ---------- */
   const group = name => svg.querySelector(".g-" + name);
 
@@ -688,10 +747,10 @@
   }
   const argOf = el => { const a = el.dataset.arg; return a === "" ? undefined : isNaN(+a) ? a : +a; };
 
-  function grabBlocked() {
+  function grabBlocked(c) {
     if (st.done) return true;
-    if (st.testing) { warn(T("Never touch the leads or connectors during a test: the cable is charged to the test voltage.")); render(); return true; }
-    if (st.dis > 0) { warn(T("Wait for the tester to discharge the cable before you touch the leads or connectors.")); render(); return true; }
+    if (st.testing) { warn(T("Never touch the leads or connectors during a test: the cable is charged to the test voltage."), clipPos(c)); render(); return true; }
+    if (st.dis > 0) { warn(T("Wait for the tester to discharge the cable before you touch the leads or connectors."), clipPos(c)); render(); return true; }
     return false;
   }
 
@@ -699,10 +758,11 @@
     const host = document.getElementById("fg");
     if (!host) return;
     host.querySelector(".fg-map").innerHTML = `<svg viewBox="0 0 1000 700" class="fg" role="group" style="aspect-ratio: 1000 / 700">
-      <g class="g-map"></g><g class="g-inset"></g><g class="g-instr"></g><g class="g-lcd"></g><g class="g-leads"></g></svg>`;
+      <g class="g-map"></g><g class="g-inset"></g><g class="g-instr"></g><g class="g-lcd"></g><g class="g-leads"></g><g class="g-alert"></g></svg>`;
     svg = host.querySelector("svg.fg");
 
     svg.addEventListener("click", e => {
+      if (e.target.closest("[data-dismiss]")) { clearTimeout(alertTimer); st.alert = null; renderAlert(); return; }
       const el = e.target.closest("[data-act]");
       if (el) act(el.dataset.act, argOf(el));
     });
@@ -710,11 +770,11 @@
       const clip = e.target.closest(".clip");
       if (clip && (e.key === "Delete" || e.key === "Backspace")) {
         e.preventDefault();
-        if (!grabBlocked()) { st.clips[clip.dataset.clip] = null; st.armed = null; render(); }
+        if (!grabBlocked(clip.dataset.clip)) { st.clips[clip.dataset.clip] = null; st.armed = null; render(); }
         return;
       }
       if (e.key !== "Enter" && e.key !== " ") return;
-      if (clip) { e.preventDefault(); if (!grabBlocked()) { st.armed = st.armed === clip.dataset.clip ? null : clip.dataset.clip; render(); } return; }
+      if (clip) { e.preventDefault(); if (!grabBlocked(clip.dataset.clip)) { st.armed = st.armed === clip.dataset.clip ? null : clip.dataset.clip; render(); } return; }
       const el = e.target.closest("[data-act]");
       if (el) { e.preventDefault(); act(el.dataset.act, argOf(el)); }
     });
@@ -723,7 +783,7 @@
       const clip = e.target.closest(".clip");
       if (!clip || e.button > 0) return;
       e.preventDefault();
-      if (grabBlocked()) return;
+      if (grabBlocked(clip.dataset.clip)) return;
       const p = toSvg(e);
       st.drag = { c: clip.dataset.clip, x: p.x, y: p.y, x0: p.x, y0: p.y, moved: false };
       svg.setPointerCapture(e.pointerId);

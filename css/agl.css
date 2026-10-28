@@ -1092,4 +1092,32 @@ input[type="range"] { accent-color: var(--accent-fill); min-height: var(--tap); 
 .fg .clip .jaw, .fg .clip .boot { stroke: var(--sign-white); stroke-width: 1.5; }
 .fg .clip.armed .clip-hit, .fg .clip:focus-visible .clip-hit { fill: var(--accent-fill); fill-opacity: 0.5; stroke: var(--sign-black); }
 @media (prefers-reduced-motion: reduce) { .fg .alarm, .fg .term.ready .term-dot { animation: none; } }
+/* Safety incidents flash on the drawing where they happen */
+.fg .g-alert { pointer-events: none; }
+.fg .al-card { pointer-events: auto; cursor: pointer; animation: fg-drop 0.35s cubic-bezier(.2, 1.4, .4, 1); }
+.fg .al-flash { fill: #ff2a1a; opacity: 0; animation: fg-flash 0.9s ease-out; }
+.fg .al-spark { animation: fg-pop 0.5s ease-out, fg-flicker 0.15s steps(2) 0.5s 6; }
+.fg .al-ring { fill: #ff2a1a; fill-opacity: 0.35; stroke: #ff2a1a; stroke-width: 3; animation: fg-ring 0.9s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+.fg .al-rays { stroke: #ffe14d; stroke-width: 4; stroke-linecap: round; fill: none; }
+.fg .al-bolt { fill: #ffe14d; stroke: #111417; stroke-width: 1.5; }
+.fg .al-border { fill: url(#fg-hazard); stroke: #111417; stroke-width: 2; }
+.fg .al-body { fill: #fffdf5; }
+.fg .al-tri { fill: #ffcc00; stroke: #111417; stroke-width: 2.5; stroke-linejoin: round; }
+.fg .al-excl { font-family: var(--f-display); font-weight: 800; font-size: 20px; fill: #111417; }
+.fg .al-title { font-family: var(--f-display); font-weight: 700; font-size: 24px; letter-spacing: 0.04em; text-transform: uppercase; fill: #b3261e; }
+.fg .al-text { font-family: var(--f-body); font-weight: 600; font-size: 16px; fill: #15202a; }
+.fg .al-hint { font-family: var(--f-body); font-size: 12px; fill: #46525d; }
+@keyframes fg-flash { 0% { opacity: 0.45; } 100% { opacity: 0; } }
+@keyframes fg-pop { 0% { transform: scale(0.2); } 60% { transform: scale(1.35); } 100% { transform: scale(1); } }
+@keyframes fg-flicker { 50% { opacity: 0.35; } }
+@keyframes fg-ring { from { transform: scale(0.6); opacity: 1; } to { transform: scale(2.4); opacity: 0; } }
+@keyframes fg-drop { from { transform: translateY(-24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fg-shake { 0%, 100% { transform: none; } 20% { transform: translateX(-8px); } 40% { transform: translateX(7px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(3px); } }
+@keyframes fg-alarm { 0%, 100% { background: var(--surface); } 30% { background: color-mix(in srgb, var(--bad) 30%, var(--surface)); } }
+.fg-map.fg-shake { animation: fg-shake 0.45s ease-in-out; }
+.fg-stats.fg-shake .readout.warn { animation: fg-alarm 0.6s ease-in-out 3; }
+@media (prefers-reduced-motion: reduce) {
+  .fg .al-card, .fg .al-spark, .fg .al-ring, .fg-map.fg-shake { animation: none; }
+  .fg .al-flash { animation: none; opacity: 0.12; }
+}
 @media (max-width: 860px) { .fg-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

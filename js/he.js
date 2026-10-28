@@ -227,6 +227,8 @@ AGL.HE.STR = {
   "3D tour": "סיור בתלת־ממד",
 
   // Fault-finding game
+  "Safety incident": "אירוע בטיחות",
+  "Click to dismiss": "לחצו לסגירה",
   "Base open.": "הבסיס פתוח.",
   "There is water in the bottom of the can.": "יש מים בתחתית הבסיס.",
   "The can is dry.": "הבסיס יבש.",
