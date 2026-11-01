@@ -125,6 +125,33 @@
   });
   window.addEventListener("hashchange", () => show(location.hash.slice(1), true));
 
+
+  // Wide diagrams scroll sideways: mark which edge still has more to show, so CSS can fade it
+  const scrollers = [...document.querySelectorAll(".scene-svg, .sim-wrap, .sld-wrap")];
+  function markScroller(el) {
+    const max = el.scrollWidth - el.clientWidth;
+    const x = Math.abs(el.scrollLeft); // containers are direction:ltr
+    const more = max > 2 ? (x < 2 ? "end" : x > max - 2 ? "start" : "both") : "";
+    if (more) el.dataset.more = more; else el.removeAttribute("data-more");
+  }
+  const markAll = () => scrollers.forEach(markScroller);
+  scrollers.forEach(el => {
+    el.addEventListener("scroll", () => markScroller(el), { passive: true });
+    new MutationObserver(() => markScroller(el)).observe(el, { childList: true });
+  });
+  window.addEventListener("resize", markAll);
+  document.addEventListener("agl:lesson", () => requestAnimationFrame(markAll));
+
+  // On phones the masthead hides when scrolling down and returns when scrolling up
+  let lastY = window.scrollY;
+  window.addEventListener("scroll", () => {
+    const y = window.scrollY, d = y - lastY;
+    const root = document.documentElement;
+    if (y < 80 || d < -8) root.classList.remove("nav-away");
+    else if (d > 8 && !document.querySelector(".masthead:focus-within")) root.classList.add("nav-away");
+    if (Math.abs(d) > 8 || y < 80) lastY = y;
+  }, { passive: true });
+
   AGL.initAirfield();
   AGL.initCircuit();
   AGL.initCalc();
@@ -139,4 +166,5 @@
   labelTables();
   AGL.onLang(() => { labelTables(); show(current.code, false); });
   show(location.hash.slice(1), false);
+  markAll();
 })();

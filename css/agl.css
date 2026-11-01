@@ -1296,3 +1296,49 @@ label.field.inline select { min-width: 180px; }
 .cd-comp.on .sym, .cd-comp.on .box { stroke: var(--accent); }
 .cd-comp.on .sym.fillk { fill: var(--accent); }
 .cd-comp.on .des { fill: var(--accent); }
+
+/* ---------------------------------------------------------------------------
+   Phones. Everything below is scoped to small screens, so the desktop layout is unchanged.
+   --------------------------------------------------------------------------- */
+
+/* Wide diagrams scroll sideways: fade the edge that still has more to show (set by app.js) */
+.scene-svg[data-more], .sim-wrap[data-more], .sld-wrap[data-more] { --fade: 36px; }
+.scene-svg[data-more="end"], .sim-wrap[data-more="end"], .sld-wrap[data-more="end"] {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - var(--fade)), transparent);
+          mask-image: linear-gradient(to right, #000 calc(100% - var(--fade)), transparent);
+}
+.scene-svg[data-more="start"], .sim-wrap[data-more="start"], .sld-wrap[data-more="start"] {
+  -webkit-mask-image: linear-gradient(to left, #000 calc(100% - var(--fade)), transparent);
+          mask-image: linear-gradient(to left, #000 calc(100% - var(--fade)), transparent);
+}
+.scene-svg[data-more="both"], .sim-wrap[data-more="both"], .sld-wrap[data-more="both"] {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent);
+          mask-image: linear-gradient(to right, transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent);
+}
+
+/* Buttons and sliders respond at once, with no double-tap zoom delay */
+button, .btn, .seg button, .rail a, .pg, input[type="range"], select, summary { touch-action: manipulation; }
+
+@media (max-width: 860px) {
+  /* Segmented controls share the row instead of scrolling out of sight */
+  .seg:not(.lang) { display: flex; width: 100%; overflow: hidden; }
+  .seg:not(.lang) button { flex: 1 1 auto; min-width: 0; padding: 8px 10px; white-space: normal; line-height: 1.25; }
+
+  /* The masthead steps aside while reading downwards and returns on the first upward scroll */
+  .masthead { transition: transform 0.22s ease; }
+  .rail { transition: top 0.22s ease; }
+  html.nav-away .masthead { transform: translateY(calc(-100% - env(safe-area-inset-top, 0px))); }
+  html.nav-away .rail { top: env(safe-area-inset-top, 0px); }
+  html { scroll-padding-top: 130px; }
+}
+@media (max-width: 860px) and (prefers-reduced-motion: reduce) {
+  .masthead, .rail { transition: none; }
+}
+
+/* A phone held sideways has little height: nothing stays pinned */
+@media (max-height: 520px) and (max-width: 1000px) {
+  .masthead { position: static; transform: none !important; }
+  .rail { position: static !important; top: auto !important; }
+  html { scroll-padding-top: 12px; }
+  body::before { display: none; }
+}
